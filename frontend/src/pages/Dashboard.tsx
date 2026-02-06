@@ -436,7 +436,7 @@ export default function Dashboard() {
 							<History size={20} />
 						</div>
 					</div>
-					<div className="h-[300px] w-full">
+					<div className="h-[300px] w-full relative">
 						<HistoryChart data={stats?.history || []} t={t} />
 					</div>
 				</div>
@@ -456,7 +456,7 @@ export default function Dashboard() {
 								<FileText size={20} />
 							</div>
 						</div>
-						<div className="h-[300px] w-full">
+						<div className="h-[300px] w-full relative">
 							<MimeChart data={stats?.mimeBreakdown || []} t={t} />
 						</div>
 					</div>

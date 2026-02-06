@@ -27,7 +27,11 @@ export default function Login() {
 		<div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 dark:bg-slate-950 transition-colors duration-200">
 			<div className="max-w-md w-full">
 				<div className="text-center mb-10">
-					<img src="/mailboxed.webp" alt="Mailboxed Logo" className="w-24 h-24 mx-auto mb-6 object-contain" />
+					<img
+						src="/mailboxed.webp"
+						alt="Mailboxed Logo"
+						className="w-24 h-24 mx-auto mb-6 object-contain"
+					/>
 					<h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2 dark:text-white">
 						Mailboxed
 					</h1>
