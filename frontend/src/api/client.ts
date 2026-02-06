@@ -63,6 +63,7 @@ export const api = {
       const searchParams = new URLSearchParams(params);
       return fetch(`${API_BASE}/downloads?${searchParams}`).then(handleResponse);
     },
+    getContentUrl: (id: number) => `${API_BASE}/downloads/${id}/content`,
   },
   jobs: {
     list: (params?: any) => {

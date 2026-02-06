@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword, encrypt, decrypt } from "./services/secur
 import { users, mailboxes, jobs, downloads } from "./db/schema";
 import { eq, desc } from "drizzle-orm";
 import { MailboxEngine } from "./services/mailbox-engine";
+import { exists } from "fs/promises";
 
 const engine = new MailboxEngine();
 
@@ -213,6 +214,41 @@ export const app = {
         }
         
         return Response.json(result);
+      }
+
+      if (path.match(/\/api\/downloads\/\d+\/content/) && req.method === "GET") {
+        const id = parseInt(path.split("/")[3]);
+        const download = await db.query.downloads.findFirst({ where: eq(downloads.id, id) });
+        if (!download) return new Response("Not found", { status: 404 });
+
+        let content: Buffer | Uint8Array;
+        const fileExists = await exists(download.path);
+
+        if (fileExists) {
+          content = await Bun.file(download.path).arrayBuffer().then(ab => new Uint8Array(ab));
+        } else {
+          try {
+            content = await engine.fetchAttachment(
+              download.mailboxId,
+              download.folder,
+              download.messageUid,
+              download.attachmentPartId
+            );
+          } catch (error: any) {
+            logger.error({ 
+              err: { message: error.message, stack: error.stack, ...error }, 
+              downloadId: id 
+            }, "Failed to fetch attachment from IMAP");
+            return new Response(`Failed to fetch attachment: ${error.message}`, { status: 500 });
+          }
+        }
+
+        return new Response(content, {
+          headers: {
+            "Content-Type": download.mime,
+            "Content-Disposition": `inline; filename="${encodeURIComponent(download.filename)}"`,
+          },
+        });
       }
 
       // Jobs

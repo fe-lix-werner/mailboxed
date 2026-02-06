@@ -33,6 +33,8 @@ i18n
             downloads: 'Downloads',
             syncNow: 'Sync Now',
             back: 'Back',
+            preview: 'Preview',
+            download: 'Download',
             confirmDelete: 'Are you sure you want to delete this mailbox? All history will be kept but sync will stop.',
           },
           dashboard: {

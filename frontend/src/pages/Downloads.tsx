@@ -67,7 +67,27 @@ export default function Downloads() {
                         <div className="text-sm font-bold text-slate-900 max-w-xs truncate" title={download.filename}>
                           {download.filename}
                         </div>
-                        <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter mt-0.5">{download.mime}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter">{download.mime}</div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <a 
+                              href={api.downloads.getContentUrl(download.id)} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-[10px] font-bold text-primary-500 hover:text-primary-700"
+                            >
+                              {t('common.preview') || 'Preview'}
+                            </a>
+                            <span className="text-[10px] text-slate-300">•</span>
+                            <a 
+                              href={api.downloads.getContentUrl(download.id)} 
+                              download={download.filename}
+                              className="text-[10px] font-bold text-primary-500 hover:text-primary-700"
+                            >
+                              {t('common.download') || 'Download'}
+                            </a>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </td>

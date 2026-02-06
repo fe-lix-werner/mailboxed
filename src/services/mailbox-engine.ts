@@ -307,6 +307,45 @@ export class MailboxEngine {
     }
   }
 
+  async fetchAttachment(mailboxId: number, folder: string, messageUid: number, partId: string): Promise<Buffer> {
+    const mailbox = await db.query.mailboxes.findFirst({
+      where: eq(mailboxes.id, mailboxId),
+    });
+
+    if (!mailbox) throw new Error("Mailbox not found");
+
+    const clientOptions: ImapFlowOptions = {
+      host: mailbox.host,
+      port: mailbox.port,
+      secure: mailbox.tlsMode === "tls",
+      auth: {
+        user: mailbox.username,
+        pass: decrypt(mailbox.passwordEnc),
+      },
+      logger: false,
+      disableAutoIdle: true,
+    };
+
+    const client = this.clientFactory ? this.clientFactory(clientOptions) : new ImapFlow(clientOptions);
+
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock(folder);
+      try {
+        const { content } = await client.download(String(messageUid), partId, { uid: true });
+        const chunks: Buffer[] = [];
+        for await (const chunk of content) {
+          chunks.push(chunk instanceof Buffer ? chunk : Buffer.from(chunk));
+        }
+        return Buffer.concat(chunks);
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout();
+    }
+  }
+
   findAttachmentParts(structure: any, parts: AttachmentPart[] = []): AttachmentPart[] {
     if (!structure) return parts;
 
