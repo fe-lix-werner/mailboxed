@@ -1,0 +1,14 @@
+services:
+  mailboxed:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/mailboxed.sqlite
+      - DOWNLOAD_ROOT=/data/downloads
+      - APP_SECRET=${APP_SECRET}
+      - IMAP_CRED_MASTER_KEY=${IMAP_CRED_MASTER_KEY}
+      - LOG_LEVEL=info
+    restart: unless-stopped
