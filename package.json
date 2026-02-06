@@ -6,6 +6,9 @@
 	"type": "module",
 	"license": "MIT",
 	"private": true,
+	"workspaces": [
+		"frontend"
+	],
 	"scripts": {
 		"dev:backend": "bun --watch src/index.ts",
 		"dev:frontend": "cd frontend && bun dev",

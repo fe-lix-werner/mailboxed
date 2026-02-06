@@ -5,11 +5,12 @@ WORKDIR /app
 # Copy root package files
 COPY package.json bun.lock ./
 
-# Copy frontend package files
+# Copy frontend package files and its lockfile if it exists (though root lockfile should cover it in workspaces)
 COPY frontend/package.json ./frontend/
 
-# Install dependencies
-RUN bun install
+# Install dependencies for both root and frontend
+# Bun workspaces will install everything and link them correctly
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY . .
