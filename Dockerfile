@@ -10,7 +10,7 @@ COPY frontend/package.json ./frontend/
 
 # Install dependencies for both root and frontend
 # Bun workspaces will install everything and link them correctly
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source code
 COPY . .
