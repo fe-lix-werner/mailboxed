@@ -1,6 +1,9 @@
 # Mailboxed
 
+![img](./mailboxed.webp)
+
 Mailboxed connects to one or more IMAP mailboxes, downloads email attachments (optionally filtered by type), saves them to a designated folder structure on disk, and keeps a complete record of what was downloaded and when.
+
 
 ## Features
 

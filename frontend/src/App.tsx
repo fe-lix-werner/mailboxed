@@ -4,7 +4,6 @@ import {
 	Languages,
 	LayoutDashboard,
 	LogOut,
-	Mail,
 	Monitor,
 	Moon,
 	RefreshCcw,
@@ -90,9 +89,7 @@ export default function App() {
 			{/* Sidebar */}
 			<aside className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 dark:bg-slate-900 dark:border-slate-800">
 				<Link to="/" className="p-8 flex items-center gap-4">
-					<div className="p-2.5 bg-primary-600 rounded-xl text-white shadow-lg shadow-primary-200 rotate-3 dark:shadow-primary-900/20">
-						<Mail size={24} />
-					</div>
+					<img src="/mailboxed.webp" alt="Mailboxed Logo" className="w-12 h-12 object-contain" />
 					<span className="font-bold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-slate-900 to-slate-500 dark:from-white dark:to-slate-400">
 						Mailboxed
 					</span>

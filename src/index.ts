@@ -101,6 +101,11 @@ export const app = {
 		// Health check
 		if (path === "/healthz") return new Response("OK");
 
+		// Logo
+		if (path === "/mailboxed.webp") {
+			return new Response(Bun.file("mailboxed.webp"));
+		}
+
 		// API Routes
 		if (path.startsWith("/api")) {
 			// Auth
