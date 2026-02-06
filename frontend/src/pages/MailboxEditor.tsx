@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ChevronLeft, Save, Shield, Server, Filter, Clock, RefreshCcw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Check, Shield, Server, Filter, Clock, RefreshCcw, CheckCircle2, AlertCircle, RotateCcw, Play, Pause, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function MailboxEditor() {
@@ -15,12 +15,27 @@ export default function MailboxEditor() {
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [testError, setTestError] = useState<string | null>(null);
   const [connectionTested, setConnectionTested] = useState(false);
+  const [initialConnectionFields, setInitialConnectionFields] = useState<any>(null);
 
   const { data: mailbox, isLoading } = useQuery({
     queryKey: ['mailboxes', id],
     queryFn: () => api.mailboxes.get(parseInt(id!)),
     enabled: !isNew,
   });
+
+  useEffect(() => {
+    if (mailbox) {
+      const fields = {
+        host: mailbox.host,
+        port: mailbox.port,
+        tlsMode: mailbox.tlsMode,
+        username: mailbox.username,
+        password: '', // Password is empty for existing mailboxes until changed
+      };
+      setInitialConnectionFields(fields);
+      setConnectionTested(true);
+    }
+  }, [mailbox]);
 
   const { register, handleSubmit, formState: { errors, isValid }, watch, setValue } = useForm({
     mode: 'onChange',
@@ -49,9 +64,36 @@ export default function MailboxEditor() {
   const watchedFields = watch(['host', 'port', 'tlsMode', 'username', 'password']);
   
   useEffect(() => {
-    setConnectionTested(false);
-    setTestStatus('idle');
-  }, [watchedFields[0], watchedFields[1], watchedFields[2], watchedFields[3], watchedFields[4]]);
+    if (!initialConnectionFields) {
+      if (isNew) {
+        setConnectionTested(false);
+        setTestStatus('idle');
+      }
+      return;
+    }
+
+    const currentFields = {
+      host: watchedFields[0],
+      port: watchedFields[1],
+      tlsMode: watchedFields[2],
+      username: watchedFields[3],
+      password: watchedFields[4] || '',
+    };
+
+    const hasChanged = 
+      currentFields.host !== initialConnectionFields.host ||
+      currentFields.port !== initialConnectionFields.port ||
+      currentFields.tlsMode !== initialConnectionFields.tlsMode ||
+      currentFields.username !== initialConnectionFields.username ||
+      currentFields.password !== initialConnectionFields.password;
+
+    if (hasChanged) {
+      setConnectionTested(false);
+      setTestStatus('idle');
+    } else {
+      setConnectionTested(true);
+    }
+  }, [watchedFields[0], watchedFields[1], watchedFields[2], watchedFields[3], watchedFields[4], initialConnectionFields, isNew]);
 
   const mutation = useMutation({
     mutationFn: (data: any) => {
@@ -70,6 +112,33 @@ export default function MailboxEditor() {
       queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
       navigate('/mailboxes');
     }
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => api.mailboxes.reset(parseInt(id!)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mailboxes', id] });
+      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      alert(t('editor.resetSuccess'));
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.mailboxes.delete(parseInt(id!)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+      navigate('/mailboxes');
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (enabled: boolean) => 
+      api.mailboxes.update(parseInt(id!), { enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mailboxes', id] });
+      queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+    },
   });
 
   const setSuggestion = (type: 'pdf' | 'images' | 'docs' | 'reset') => {
@@ -114,6 +183,22 @@ export default function MailboxEditor() {
     }
   };
 
+  const handleReset = () => {
+    if (window.confirm(t('common.confirmReset'))) {
+      resetMutation.mutate();
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(t('common.confirmDelete'))) {
+      deleteMutation.mutate();
+    }
+  };
+
+  const handleToggle = () => {
+    toggleMutation.mutate(!mailbox.enabled);
+  };
+
   if (!isNew && isLoading) return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="flex flex-col items-center gap-4">
@@ -128,48 +213,75 @@ export default function MailboxEditor() {
       <header className="flex items-center gap-6">
         <button 
           onClick={() => navigate(-1)} 
-          className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all group cursor-pointer"
+          className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all group cursor-pointer dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800"
         >
-          <ChevronLeft size={24} className="text-slate-400 group-hover:text-slate-900 transition-colors" />
+          <ChevronLeft size={24} className="text-slate-400 group-hover:text-slate-900 transition-colors dark:text-slate-500 dark:group-hover:text-white" />
         </button>
         <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">{isNew ? t('editor.newTitle') : t('editor.editTitle')}</h1>
-          <p className="text-slate-500 mt-1 text-lg">{t('editor.subtitle')}</p>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight dark:text-white">{isNew ? t('editor.newTitle') : t('editor.editTitle')}</h1>
+          <p className="text-slate-500 mt-1 text-lg dark:text-slate-400">{t('editor.subtitle')}</p>
         </div>
+        {!isNew && mailbox && (
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex flex-col items-end mr-2">
+              <span className="text-[10px] uppercase tracking-widest font-extrabold text-slate-400 dark:text-slate-500">{t('common.status')}</span>
+              <span className={`text-sm font-bold ${mailbox.enabled ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-600'}`}>
+                {mailbox.enabled ? t('mailboxes.active') : t('mailboxes.paused')}
+              </span>
+            </div>
+            <button 
+              type="button"
+              onClick={handleToggle}
+              disabled={toggleMutation.isPending}
+              className={`btn w-11 h-11 p-0 border rounded-xl transition-all duration-300 ${
+                mailbox.enabled 
+                  ? 'bg-amber-50 border-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white dark:bg-amber-950/30 dark:border-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-600' 
+                  : 'bg-green-50 border-green-100 text-green-600 hover:bg-green-600 hover:text-white dark:bg-green-950/30 dark:border-green-900/30 dark:text-green-400 dark:hover:bg-green-600'
+              }`}
+              title={mailbox.enabled ? t('common.pause') : t('common.resume')}
+            >
+              {toggleMutation.isPending ? (
+                <RefreshCcw size={20} className="animate-spin" />
+              ) : (
+                mailbox.enabled ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />
+              )}
+            </button>
+          </div>
+        )}
       </header>
 
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             {/* Connection Settings */}
-            <section className="card border-slate-200/50">
-              <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg">
+            <section className="card">
+              <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg dark:bg-blue-900/30 dark:text-blue-400">
                   <Server size={18} />
                 </div>
-                <h2 className="font-bold text-slate-900 uppercase tracking-wider text-xs">{t('editor.connectionSettings')}</h2>
+                <h2 className="font-bold text-slate-900 uppercase tracking-wider text-xs dark:text-slate-300">{t('editor.connectionSettings')}</h2>
               </div>
               <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.displayName')}</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.displayName')}</label>
                   <input {...register('name', { required: t('editor.required') })} className={`input h-12 text-lg font-medium ${errors.name ? 'border-red-500 focus:ring-red-500' : ''}`} placeholder="Personal Gmail, Office 365..." />
                   {errors.name && <p className="mt-1 text-xs text-red-500 font-bold">{errors.name.message as string}</p>}
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.imapHost')}</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.imapHost')}</label>
                   <input {...register('host', { required: t('editor.required') })} className={`input h-11 ${errors.host ? 'border-red-500 focus:ring-red-500' : ''}`} placeholder="imap.gmail.com" />
                   {errors.host && <p className="mt-1 text-xs text-red-500 font-bold">{errors.host.message as string}</p>}
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.port')}</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.port')}</label>
                     <input type="number" {...register('port', { required: t('editor.required'), valueAsNumber: true })} className={`input h-11 ${errors.port ? 'border-red-500 focus:ring-red-500' : ''}`} />
                     {errors.port && <p className="mt-1 text-xs text-red-500 font-bold">{errors.port.message as string}</p>}
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.tlsMode')}</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.tlsMode')}</label>
                     <select {...register('tlsMode')} className="input h-11 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25em_1.25em] bg-[right_0.5rem_center] bg-no-repeat">
                       <option value="tls">SSL/TLS</option>
                       <option value="starttls">STARTTLS</option>
@@ -179,13 +291,13 @@ export default function MailboxEditor() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.username')}</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.username')}</label>
                   <input {...register('username', { required: t('editor.required') })} className={`input h-11 ${errors.username ? 'border-red-500 focus:ring-red-500' : ''}`} placeholder="user@example.com" />
                   {errors.username && <p className="mt-1 text-xs text-red-500 font-bold">{errors.username.message as string}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.password')}</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.password')}</label>
                   <input type="password" {...register('password', { required: isNew ? t('editor.required') : false })} className={`input h-11 ${errors.password ? 'border-red-500 focus:ring-red-500' : ''}`} placeholder={isNew ? "••••••••" : t('editor.passwordPlaceholder')} />
                   {errors.password && <p className="mt-1 text-xs text-red-500 font-bold">{errors.password.message as string}</p>}
                 </div>
@@ -196,9 +308,9 @@ export default function MailboxEditor() {
                     onClick={testConnection}
                     disabled={testStatus === 'loading' || !watchedFields[0] || !watchedFields[3]}
                     className={`w-full h-11 flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all border-2 ${
-                      testStatus === 'success' ? 'bg-green-50 border-green-200 text-green-700' :
-                      testStatus === 'error' ? 'bg-red-50 border-red-200 text-red-700' :
-                      'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      testStatus === 'success' ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-950/30 dark:border-green-900/30 dark:text-green-400' :
+                      testStatus === 'error' ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-950/30 dark:border-red-900/30 dark:text-red-400' :
+                      'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700'
                     }`}
                   >
                     {testStatus === 'loading' ? <RefreshCcw size={16} className="animate-spin" /> : 
@@ -216,43 +328,43 @@ export default function MailboxEditor() {
             </section>
 
             {/* Storage & Rules */}
-            <section className="card border-slate-200/50">
-              <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                <div className="p-1.5 bg-green-100 text-green-600 rounded-lg">
+            <section className="card">
+              <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="p-1.5 bg-green-100 text-green-600 rounded-lg dark:bg-green-900/30 dark:text-green-400">
                   <Filter size={18} />
                 </div>
-                <h2 className="font-bold text-slate-900 uppercase tracking-wider text-xs">{t('editor.storageFilters')}</h2>
+                <h2 className="font-bold text-slate-900 uppercase tracking-wider text-xs dark:text-slate-300">{t('editor.storageFilters')}</h2>
               </div>
               <div className="p-8 space-y-8">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.baseDownloadPath')}</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.baseDownloadPath')}</label>
                   <input {...register('basePath')} className="input h-11 font-mono text-sm" placeholder="e.g. invoices/primary" />
-                  <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tighter italic">
-                    {t('editor.baseDownloadPathHint')} <code className="text-primary-500 font-black">downloads/&lt;path&gt;/YYYY-MM/filename</code>
+                  <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tighter italic dark:text-slate-500">
+                    {t('editor.baseDownloadPathHint')}
                   </p>
                 </div>
 
-                <div className="pt-6 border-t border-slate-100">
+                <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between mb-4">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">{t('editor.filters')}</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest dark:text-slate-400">{t('editor.filters')}</label>
                     <div className="flex gap-1.5">
-                       <button type="button" onClick={() => setSuggestion('pdf')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors">{t('editor.suggestPdf')}</button>
-                       <button type="button" onClick={() => setSuggestion('images')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors">{t('editor.suggestImages')}</button>
-                       <button type="button" onClick={() => setSuggestion('docs')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors">{t('editor.suggestDocs')}</button>
-                       <button type="button" onClick={() => setSuggestion('reset')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors">{t('editor.suggestReset')}</button>
+                       <button type="button" onClick={() => setSuggestion('pdf')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-primary-900/40 dark:hover:text-primary-400">{t('editor.suggestPdf')}</button>
+                       <button type="button" onClick={() => setSuggestion('images')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-primary-900/40 dark:hover:text-primary-400">{t('editor.suggestImages')}</button>
+                       <button type="button" onClick={() => setSuggestion('docs')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-primary-900/40 dark:hover:text-primary-400">{t('editor.suggestDocs')}</button>
+                       <button type="button" onClick={() => setSuggestion('reset')} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-red-900/40 dark:hover:text-red-400">{t('editor.suggestReset')}</button>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{t('editor.allowedExtensions')}</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 dark:text-slate-500">{t('editor.allowedExtensions')}</label>
                       <input {...register('allowedExtensions')} className="input h-11 text-sm" placeholder="pdf, docx, jpg..." />
-                      <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic">{t('editor.allowedExtensionsHint')}</p>
+                      <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic dark:text-slate-600">{t('editor.allowedExtensionsHint')}</p>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{t('editor.allowedMimes')}</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 dark:text-slate-500">{t('editor.allowedMimes')}</label>
                       <input {...register('allowedMimes')} className="input h-11 text-sm" placeholder="application/pdf, image/*..." />
-                      <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic">{t('editor.allowedMimesHint')}</p>
+                      <p className="mt-1.5 text-[10px] text-slate-400 font-medium italic dark:text-slate-600">{t('editor.allowedMimesHint')}</p>
                     </div>
                   </div>
                 </div>
@@ -262,41 +374,41 @@ export default function MailboxEditor() {
 
           <div className="space-y-8">
             {/* Sync Logic */}
-            <section className="card border-slate-200/50">
-              <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                <div className="p-1.5 bg-amber-100 text-amber-600 rounded-lg">
+            <section className="card">
+              <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="p-1.5 bg-amber-100 text-amber-600 rounded-lg dark:bg-amber-900/30 dark:text-amber-400">
                   <Clock size={18} />
                 </div>
-                <h2 className="font-bold text-slate-900 uppercase tracking-wider text-xs">{t('editor.automation')}</h2>
+                <h2 className="font-bold text-slate-900 uppercase tracking-wider text-xs dark:text-slate-300">{t('editor.automation')}</h2>
               </div>
               <div className="p-8 space-y-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.initialSyncMode')}</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.initialSyncMode')}</label>
                   <div className="grid grid-cols-1 gap-2">
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${watch('syncMode') === 'from_now_on' ? 'border-primary-500 bg-primary-50/50' : 'border-slate-100 hover:border-slate-200'}`}>
-                      <input type="radio" value="from_now_on" {...register('syncMode')} className="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500" />
+                    <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${watch('syncMode') === 'from_now_on' ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-950/20' : 'border-slate-100 hover:border-slate-200 dark:border-slate-800 dark:hover:border-slate-700'}`}>
+                      <input type="radio" value="from_now_on" {...register('syncMode')} className="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-900" />
                       <div>
-                        <span className="block text-sm font-bold text-slate-900">{t('editor.fromNowOn')}</span>
-                        <span className="text-[10px] text-slate-500 font-medium leading-none">{t('editor.fromNowOnHint')}</span>
+                        <span className="block text-sm font-bold text-slate-900 dark:text-slate-200">{t('editor.fromNowOn')}</span>
+                        <span className="text-[10px] text-slate-500 font-medium leading-none dark:text-slate-500">{t('editor.fromNowOnHint')}</span>
                       </div>
                     </label>
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${watch('syncMode') === 'everything' ? 'border-primary-500 bg-primary-50/50' : 'border-slate-100 hover:border-slate-200'}`}>
-                      <input type="radio" value="everything" {...register('syncMode')} className="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500" />
+                    <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${watch('syncMode') === 'everything' ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-950/20' : 'border-slate-100 hover:border-slate-200 dark:border-slate-800 dark:hover:border-slate-700'}`}>
+                      <input type="radio" value="everything" {...register('syncMode')} className="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-900" />
                       <div>
-                        <span className="block text-sm font-bold text-slate-900">{t('editor.everything')}</span>
-                        <span className="text-[10px] text-slate-500 font-medium leading-none">{t('editor.everythingHint')}</span>
+                        <span className="block text-sm font-bold text-slate-900 dark:text-slate-200">{t('editor.everything')}</span>
+                        <span className="text-[10px] text-slate-500 font-medium leading-none dark:text-slate-500">{t('editor.everythingHint')}</span>
                       </div>
                     </label>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{t('editor.pollInterval')}</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 dark:text-slate-400">{t('editor.pollInterval')}</label>
                   <div className="flex items-center gap-4">
                     <input type="number" {...register('pollIntervalSec', { valueAsNumber: true })} className="input h-11 text-center font-bold" />
-                    <span className="text-sm font-bold text-slate-400">SEC</span>
+                    <span className="text-sm font-bold text-slate-400 dark:text-slate-500">SEC</span>
                   </div>
-                  <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tighter italic">{t('editor.pollIntervalHint')}</p>
+                  <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tighter italic dark:text-slate-500">{t('editor.pollIntervalHint')}</p>
                 </div>
               </div>
             </section>
@@ -306,17 +418,50 @@ export default function MailboxEditor() {
               <button 
                 type="submit" 
                 disabled={mutation.isPending || !isValid || !connectionTested}
-                className={`btn-primary h-14 w-full text-lg shadow-xl gap-3 cursor-pointer ${(!isValid || !connectionTested) ? 'opacity-50 cursor-not-allowed shadow-none grayscale' : 'shadow-primary-200'}`}
+                className={`btn-primary h-12 w-full gap-3 transition-all ${(!isValid || !connectionTested) ? 'opacity-50 cursor-not-allowed shadow-none' : ''}`}
               >
                 {mutation.isPending ? (
                   <RefreshCcw size={20} className="animate-spin" />
                 ) : (
                   <>
-                    <Save size={20} fill="currentColor" />
+                    <Check size={20} strokeWidth={3} />
                     {isNew ? t('editor.createMailbox') : t('editor.saveChanges')}
                   </>
                 )}
               </button>
+              
+              {!isNew && (
+                <button 
+                  type="button" 
+                  onClick={handleReset}
+                  disabled={resetMutation.isPending}
+                  className="w-full h-12 flex items-center justify-center gap-2 rounded-xl font-bold text-sm bg-amber-50 text-amber-700 border-2 border-amber-100 hover:bg-amber-100 transition-all cursor-pointer dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/30 dark:hover:bg-amber-900/50"
+                >
+                  {resetMutation.isPending ? (
+                    <RefreshCcw size={18} className="animate-spin" />
+                  ) : (
+                    <RotateCcw size={18} />
+                  )}
+                  {t('common.resetSync')}
+                </button>
+              )}
+
+              {!isNew && (
+                <button 
+                  type="button" 
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                  className="w-full h-12 flex items-center justify-center gap-2 rounded-xl font-bold text-sm bg-red-50 text-red-700 border-2 border-red-100 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all cursor-pointer dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/30 dark:hover:bg-red-600 dark:hover:text-white dark:hover:border-red-600"
+                >
+                  {deleteMutation.isPending ? (
+                    <RefreshCcw size={18} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={18} />
+                  )}
+                  {t('common.delete')}
+                </button>
+              )}
+
               <button 
                 type="button" 
                 onClick={() => navigate(-1)}

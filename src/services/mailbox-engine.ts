@@ -2,10 +2,12 @@ import { ImapFlow, type ImapFlowOptions } from "imapflow";
 import { logger } from "./logger";
 import { decrypt } from "./security";
 import { db } from "../db";
-import { mailboxes, jobs, checkpoints } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { mailboxes, jobs, checkpoints, downloads } from "../db/schema";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { AttachmentProcessor } from "./attachment-processor";
 import type { SyncStats, MailboxFilter } from "../types";
+import { rm } from "fs/promises";
+import { join } from "path";
 
 type AttachmentPart = {
   part: string;
@@ -21,7 +23,26 @@ type FetchedItem = {
 };
 
 export class MailboxEngine {
+  private activeSyncs = new Map<number, AbortController>();
+
   constructor(private clientFactory?: (options: ImapFlowOptions) => ImapFlow) {}
+
+  abort(mailboxId: number) {
+    const controller = this.activeSyncs.get(mailboxId);
+    if (controller) {
+      logger.info({ mailboxId }, "Aborting active sync job");
+      controller.abort();
+      this.activeSyncs.delete(mailboxId);
+    }
+  }
+
+  abortAll() {
+    logger.info({ activeCount: this.activeSyncs.size }, "Aborting all active sync jobs");
+    for (const [mailboxId, controller] of this.activeSyncs.entries()) {
+      controller.abort();
+    }
+    this.activeSyncs.clear();
+  }
 
   async testConnection(config: any) {
     const clientOptions: ImapFlowOptions = {
@@ -48,7 +69,7 @@ export class MailboxEngine {
 
   async sync(mailboxId: number, trigger: "poll" | "manual" = "poll", force: boolean = false) {
     if (process.env.NODE_ENV === "test" && !force) {
-      logger.info({ mailboxId, trigger }, "Sync skipped in test environment");
+      logger.debug({ mailboxId, trigger }, "Sync skipped in test environment");
       return;
     }
 
@@ -58,15 +79,49 @@ export class MailboxEngine {
 
     if (!mailbox || !mailbox.enabled) return;
 
+    // Concurrency guard: do not start a new sync when one is already running
+    const runningJob = await db.query.jobs.findFirst({
+      where: and(eq(jobs.mailboxId, mailboxId), eq(jobs.status, "running")),
+    });
+
+    if (runningJob) {
+      if (mailbox.busyPolicy === "queue_one") {
+        // Only create a single queued job if none exists yet
+        const queuedJob = await db.query.jobs.findFirst({
+          where: and(eq(jobs.mailboxId, mailboxId), eq(jobs.status, "queued")),
+        });
+        if (!queuedJob) {
+          await db.insert(jobs).values({
+            mailboxId,
+            mailboxName: mailbox.name,
+            trigger,
+            status: "queued",
+          });
+          logger.info({ mailboxId, trigger }, "Sync queued because a previous sync is still running");
+        } else {
+          logger.info({ mailboxId, trigger }, "Sync already queued; keeping single queued job while running");
+        }
+      } else {
+        // Default/skip policy
+        logger.info({ mailboxId, trigger }, "Sync skipped because a previous sync is still running");
+      }
+      return;
+    }
+
     const [job] = await db
       .insert(jobs)
       .values({
         mailboxId,
+        mailboxName: mailbox.name,
         trigger,
         status: "running",
         startedAt: new Date().toISOString(),
       })
       .returning();
+
+    const controller = new AbortController();
+    this.activeSyncs.set(mailboxId, controller);
+    const { signal } = controller;
 
     const stats: SyncStats = {
       scannedMessages: 0,
@@ -85,7 +140,7 @@ export class MailboxEngine {
       secure: mailbox.tlsMode === "tls",
       auth: {
         user: mailbox.username,
-        pass: decrypt(mailbox.passwordEnc),
+        pass: await decrypt(mailbox.passwordEnc),
       },
       logger: false,
       // strongly reduces IMAP state issues while doing fetch/download sequences
@@ -120,67 +175,91 @@ export class MailboxEngine {
       );
 
       for (const folder of folders) {
+        if (signal.aborted) break;
         const lock = await client.getMailboxLock(folder);
         try {
           const checkpoint = await db.query.checkpoints.findFirst({
             where: and(eq(checkpoints.mailboxId, mailboxId), eq(checkpoints.folder, folder)),
           });
 
-          const searchCriteria: any = checkpoint?.lastUid
-            ? { uid: `${checkpoint.lastUid + 1}:*` }
-            : mailbox.syncMode === "everything"
-              ? { all: true }
-              : { since: checkpoint?.fromNowTimestamp ? new Date(checkpoint.fromNowTimestamp) : new Date() };
-
-          if (!checkpoint && mailbox.syncMode === "from-now-on") {
+          const searchCriteria: any = {};
+          if (checkpoint?.lastUid) {
+            searchCriteria.uid = `${checkpoint.lastUid + 1}:*`;
+          } else if (mailbox.syncMode === "everything") {
+            searchCriteria.all = true;
+          } else {
+            // from-now-on mode, no checkpoint yet
             const now = new Date();
+            searchCriteria.since = now;
             await db.insert(checkpoints).values({
               mailboxId,
               folder,
               fromNowTimestamp: now.toISOString(),
             });
-            searchCriteria.since = now;
           }
 
-          logger.info({ mailboxId, folder, searchCriteria }, "Fetching messages");
+          if (process.env.DEBUG_SEARCH) {
+            logger.debug({ mailboxId, folder, searchCriteria }, "DEBUG: Search criteria constructed");
+          }
 
           // PHASE 1: fetch only metadata + structure, do NOT download inside this iterator
           const items: FetchedItem[] = [];
-          const fetcher = client.fetch(searchCriteria, { uid: true, envelope: true, bodyStructure: true });
+          
+          logger.debug({ mailboxId, folder, searchCriteria }, "Searching for messages");
 
-          for await (const msg of fetcher) {
-            stats.scannedMessages++;
+          let uids = await client.search(searchCriteria , {uid: true});
+          if(checkpoint?.lastUid && checkpoint.lastUid > 0){
+            uids = uids && uids.filter(u => u > checkpoint.lastUid!!);
+          }
 
-            const parts = this.findAttachmentParts(msg.bodyStructure);
+          if (!uids || uids.length === 0 /*|| (uids.length === 1 && uids[0] < checkpoint.lastUid + 1)*/) {
+            logger.debug({ mailboxId, folder }, "No messages found matching criteria");
+          } else {
+            logger.debug({ mailboxId, folder, count: uids.length }, "Fetching metadata for found messages");
 
-            logger.info(
-              {
+            // PHASE 1: fetch only metadata + structure, do NOT download inside this iterator
+            const fetcher = client.fetch(uids, { uid: true, envelope: true, bodyStructure: true });
+
+            for await (const msg of fetcher) {
+              if (signal.aborted) break;
+              stats.scannedMessages++;
+
+              const parts = this.findAttachmentParts(msg.bodyStructure);
+
+              logger.debug(
+                {
+                  uid: msg.uid,
+                  subject: msg.envelope?.subject,
+                  attachmentCount: parts.length,
+                },
+                "Queued message for attachment download"
+              );
+
+              items.push({
                 uid: msg.uid,
-                subject: msg.envelope?.subject,
-                attachmentCount: parts.length,
-              },
-              "Queued message for attachment download"
-            );
-
-            items.push({
-              uid: msg.uid,
-              envelope: msg.envelope,
-              parts,
-            });
-
-            // Update checkpoint per message to be resilient (as your original)
-            const currentCheckpoint = await db.query.checkpoints.findFirst({
-              where: and(eq(checkpoints.mailboxId, mailboxId), eq(checkpoints.folder, folder)),
-            });
-
-            if (currentCheckpoint) {
-              await db.update(checkpoints).set({ lastUid: msg.uid }).where(eq(checkpoints.id, currentCheckpoint.id));
-            } else {
-              await db.insert(checkpoints).values({
-                mailboxId,
-                folder,
-                lastUid: msg.uid,
+                envelope: msg.envelope,
+                parts,
               });
+
+              // Update checkpoint per message to be resilient (as your original)
+              const currentCheckpoint = await db.query.checkpoints.findFirst({
+                where: and(eq(checkpoints.mailboxId, mailboxId), eq(checkpoints.folder, folder)),
+              });
+
+              if (currentCheckpoint) {
+                await db
+                  .update(checkpoints)
+                  .set({ 
+                    lastUid: msg.uid
+                  })
+                  .where(eq(checkpoints.id, currentCheckpoint.id));
+              } else {
+                await db.insert(checkpoints).values({
+                  mailboxId,
+                  folder,
+                  lastUid: msg.uid
+                });
+              }
             }
           }
 
@@ -194,12 +273,19 @@ export class MailboxEngine {
             const mailboxState = await client.status(folder, { uidNext: true });
             if (mailboxState.uidNext) {
               if (finalCheckpoint) {
-                await db.update(checkpoints).set({ lastUid: mailboxState.uidNext - 1 }).where(eq(checkpoints.id, finalCheckpoint.id));
+                await db
+                  .update(checkpoints)
+                  .set({ 
+                    lastUid: mailboxState.uidNext - 1,
+                    fromNowTimestamp: mailbox.syncMode === "from-now-on" ? new Date().toISOString() : finalCheckpoint.fromNowTimestamp
+                  })
+                  .where(eq(checkpoints.id, finalCheckpoint.id));
               } else {
                 await db.insert(checkpoints).values({
                   mailboxId,
                   folder,
                   lastUid: mailboxState.uidNext - 1,
+                  fromNowTimestamp: mailbox.syncMode === "from-now-on" ? new Date().toISOString() : null
                 });
               }
             }
@@ -207,7 +293,9 @@ export class MailboxEngine {
 
           // PHASE 2: now download parts sequentially (no active fetch iterator)
           for (const item of items) {
+            if (signal.aborted) break;
             for (const part of item.parts) {
+              if (signal.aborted) break;
               let partAttempt = 0;
               let partSuccess = false;
 
@@ -215,14 +303,15 @@ export class MailboxEngine {
                 try {
                   const { content: stream } = await client.download(item.uid, part.part, {
                     uid: true,
-                    chunkSize: 1024,
+                    chunkSize: 4 * 1024 * 1024,
                   });
 
                   const chunks: Buffer[] = [];
                   for await (const chunk of stream as any) {
                     if (Buffer.isBuffer(chunk)) chunks.push(chunk);
-                    else if (chunk instanceof Uint8Array) chunks.push(Buffer.from(chunk));
-                    else chunks.push(Buffer.from(String(chunk)));
+                    else {
+                      chunks.push(Buffer.from(chunk));
+                    }
                   }
                   const content = Buffer.concat(chunks);
 
@@ -242,10 +331,10 @@ export class MailboxEngine {
 
                   if (result.saved) {
                     stats.savedAttachments++;
-                    logger.info({ mailboxId, uid: item.uid, part: part.part, filename: part.filename }, "Attachment saved");
+                    logger.debug({ mailboxId, uid: item.uid, part: part.part, filename: part.filename }, "Attachment saved");
                   } else if (result.skipped) {
                     stats.skipped++;
-                    logger.info({ mailboxId, uid: item.uid, part: part.part, filename: part.filename }, "Attachment skipped by filters");
+                    logger.debug({ mailboxId, uid: item.uid, part: part.part, filename: part.filename }, "Attachment skipped by filters");
                   }
                   if (result.error) {
                     stats.errors++;
@@ -274,14 +363,21 @@ export class MailboxEngine {
         }
       }
 
+      if (signal.aborted) {
+        throw new Error("Sync cancelled");
+      }
+
       await db
         .update(jobs)
         .set({
           status: "success",
           finishedAt: new Date().toISOString(),
           statsJson: JSON.stringify(stats),
+          attachmentCount: stats.savedAttachments,
         })
-        .where(eq(jobs.id, job.id));
+        .where(eq(jobs.id, job?.id || -1));
+
+      await this.pruneJobs();
     } catch (error: any) {
       logger.error(
         {
@@ -296,14 +392,38 @@ export class MailboxEngine {
       await db
         .update(jobs)
         .set({
-          status: "failed",
+          status: error.message === "Sync cancelled" ? "cancelled" : "failed",
           finishedAt: new Date().toISOString(),
           errorText: error.message,
           statsJson: JSON.stringify(stats),
+          attachmentCount: stats.savedAttachments,
         })
-        .where(eq(jobs.id, job.id));
+        .where(eq(jobs.id, job?.id || -1));
+
+      await this.pruneJobs();
     } finally {
+      this.activeSyncs.delete(mailboxId);
       await client.logout();
+    }
+  }
+
+  async pruneJobs() {
+    try {
+      const allJobs = await db.query.jobs.findMany({
+        orderBy: [desc(jobs.id)],
+      });
+
+      if (allJobs.length > 1000) {
+        const toDelete = allJobs.slice(1000);
+        const idsToDelete = toDelete.map((j) => j.id);
+        
+        // sqlite might have limits on the number of parameters, but 1000ish should be fine
+        // for safety we can do it in a loop or chunks if needed, but for now:
+        await db.delete(jobs).where(inArray(jobs.id, idsToDelete));
+        logger.info({ deletedCount: idsToDelete.length }, "Pruned old jobs");
+      }
+    } catch (err) {
+      logger.error({ err }, "Failed to prune jobs");
     }
   }
 
@@ -320,7 +440,7 @@ export class MailboxEngine {
       secure: mailbox.tlsMode === "tls",
       auth: {
         user: mailbox.username,
-        pass: decrypt(mailbox.passwordEnc),
+        pass: await decrypt(mailbox.passwordEnc),
       },
       logger: false,
       disableAutoIdle: true,
@@ -335,7 +455,7 @@ export class MailboxEngine {
         const { content } = await client.download(String(messageUid), partId, { uid: true });
         const chunks: Buffer[] = [];
         for await (const chunk of content) {
-          chunks.push(chunk instanceof Buffer ? chunk : Buffer.from(chunk));
+          chunks.push(chunk);
         }
         return Buffer.concat(chunks);
       } finally {
@@ -343,6 +463,49 @@ export class MailboxEngine {
       }
     } finally {
       await client.logout();
+    }
+  }
+
+  async reset(mailboxId: number) {
+    const mailbox = await db.query.mailboxes.findFirst({
+      where: eq(mailboxes.id, mailboxId),
+    });
+
+    if (!mailbox) throw new Error("Mailbox not found");
+
+    logger.info({ mailboxId }, "Resetting mailbox: stopping jobs, deleting checkpoints, downloads, and files");
+
+    // 1. Abort any running sync
+    this.abort(mailboxId);
+
+    // 2. Update database: set unfinished jobs to cancelled, delete checkpoints and downloads
+    await db.transaction(async (tx) => {
+      // Set all 'queued' or 'running' jobs for this mailbox to 'cancelled'
+      await tx
+        .update(jobs)
+        .set({
+          status: "cancelled",
+          finishedAt: new Date().toISOString(),
+          errorText: "Mailbox reset",
+        })
+        .where(
+          and(
+            eq(jobs.mailboxId, mailboxId),
+            inArray(jobs.status, ["queued", "running"])
+          )
+        );
+
+      await tx.delete(checkpoints).where(eq(checkpoints.mailboxId, mailboxId));
+      await tx.delete(downloads).where(eq(downloads.mailboxId, mailboxId));
+    });
+
+    // 3. Also clear files from disk under the same path used by AttachmentProcessor
+    const fullDir = join(process.env.DOWNLOAD_ROOT || "downloads", mailbox.basePath, mailbox.name);
+    try {
+      await rm(fullDir, { recursive: true, force: true });
+    } catch (err) {
+      // Best-effort removal; log and continue
+      logger.warn({ err, mailboxId, fullDir }, "Failed to remove mailbox download directory");
     }
   }
 

@@ -8,6 +8,7 @@ import { logger } from "./logger";
 export class Scheduler {
   private jobs: Map<number, Cron> = new Map();
   private engine: MailboxEngine;
+  private paused: boolean = false;
 
   constructor(engine?: MailboxEngine) {
     this.engine = engine || new MailboxEngine();
@@ -22,7 +23,21 @@ export class Scheduler {
       this.scheduleMailbox(mb.id, mb.pollIntervalSec);
     }
     
-    logger.info(`Scheduler initialized with ${allMailboxes.length} active mailboxes`);
+    logger.debug(`Scheduler initialized with ${allMailboxes.length} active mailboxes`);
+  }
+
+  pause() {
+    this.paused = true;
+    logger.info("Scheduler paused");
+  }
+
+  resume() {
+    this.paused = false;
+    logger.info("Scheduler resumed");
+  }
+
+  isPaused() {
+    return this.paused;
   }
 
   scheduleMailbox(mailboxId: number, intervalSec: number) {
@@ -44,12 +59,23 @@ export class Scheduler {
       cronPattern = `0 */${minutes} * * * *`;
     }
     
-    const job = new Cron(cronPattern, async () => {
-      logger.info({ mailboxId }, "Starting scheduled sync");
+    const job = new Cron(cronPattern, {
+      seconds: true,
+    }, async () => {
+      if (this.paused) {
+        logger.debug({ mailboxId }, "Scheduler is paused, skipping sync");
+        return;
+      }
+      logger.debug({ mailboxId }, "Starting scheduled sync");
       await this.engine.sync(mailboxId, "poll");
     });
 
     this.jobs.set(mailboxId, job);
+  }
+
+  getNextRun(mailboxId: number): Date | null {
+    const job = this.jobs.get(mailboxId);
+    return job ? job.nextRun() : null;
   }
 
   stopMailbox(mailboxId: number) {

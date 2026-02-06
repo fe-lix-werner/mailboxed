@@ -42,11 +42,13 @@ export const checkpoints = sqliteTable("checkpoints", {
 export const jobs = sqliteTable("jobs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   mailboxId: integer("mailbox_id").references(() => mailboxes.id).notNull(),
+  mailboxName: text("mailbox_name"), // Added for redundancy/display
   trigger: text("trigger", { enum: ["poll", "manual"] }).notNull(),
-  status: text("status", { enum: ["queued", "running", "success", "failed"] }).notNull(),
+  status: text("status", { enum: ["queued", "running", "success", "failed", "cancelled"] }).notNull(),
   startedAt: text("started_at"),
   finishedAt: text("finished_at"),
   statsJson: text("stats_json"),
+  attachmentCount: integer("attachment_count").default(0), // Added for dashboard
   errorText: text("error_text"),
 });
 

@@ -1,18 +1,17 @@
 services:
   mailboxed:
-    image: mailboxed:latest
+    build: ..
+    container_name: mailboxed
     ports:
       - "3000:3000"
-    volumes:
-      - ./data:/data
     environment:
       - DB_PATH=/data/mailboxed.sqlite
       - DOWNLOAD_ROOT=/data/downloads
-      - DEFAULT_USER_EMAIL=${DEFAULT_USER_EMAIL:-admin@example.com}
-      - DEFAULT_USER_PASSWORD=${DEFAULT_USER_PASSWORD:-admin}
-      - APP_SECRET=${APP_SECRET:-}
-      - IMAP_CRED_MASTER_KEY=${IMAP_CRED_MASTER_KEY:-}
-      - LOG_LEVEL=${LOG_DEBUG:-debug}
+      - DEFAULT_USER_EMAIL=admin@example.com
+      - DEFAULT_USER_PASSWORD=admin
+      - LOG_LEVEL=debug
+    volumes:
+      - ./data:/data
     healthcheck:
       test: ["CMD", "bun", "-e", "await fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s

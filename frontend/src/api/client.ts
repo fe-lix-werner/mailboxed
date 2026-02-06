@@ -57,6 +57,7 @@ export const api = {
         body: JSON.stringify(data),
       }).then(handleResponse),
     sync: (id: number) => fetch(`${API_BASE}/mailboxes/${id}/sync`, { method: 'POST' }).then(handleResponse),
+    reset: (id: number) => fetch(`${API_BASE}/mailboxes/${id}/reset`, { method: 'POST' }).then(handleResponse),
   },
   downloads: {
     list: (params?: any) => {
@@ -70,6 +71,11 @@ export const api = {
       const searchParams = new URLSearchParams(params);
       return fetch(`${API_BASE}/jobs?${searchParams}`).then(handleResponse);
     },
+    abortAll: () => fetch(`${API_BASE}/jobs/abort-all`, { method: 'POST' }).then(handleResponse),
+    restartAll: () => fetch(`${API_BASE}/jobs/restart-all`, { method: 'POST' }).then(handleResponse),
+    schedulerStatus: () => fetch(`${API_BASE}/jobs/scheduler/status`).then(handleResponse),
+    pauseScheduler: () => fetch(`${API_BASE}/jobs/scheduler/pause`, { method: 'POST' }).then(handleResponse),
+    resumeScheduler: () => fetch(`${API_BASE}/jobs/scheduler/resume`, { method: 'POST' }).then(handleResponse),
   },
   stats: {
     get: () => fetch(`${API_BASE}/stats`).then(handleResponse),

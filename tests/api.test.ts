@@ -258,6 +258,66 @@ describe("API Endpoints", () => {
     });
   });
 
+  describe("Job Control Endpoints", () => {
+    test("POST /api/jobs/abort-all should return 200", async () => {
+        const cookie = await login();
+        const req = new Request("http://localhost/api/jobs/abort-all", {
+            method: "POST",
+            headers: { Cookie: cookie || "" },
+        });
+        const res = await app.fetch(req);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.success).toBe(true);
+    });
+
+    test("POST /api/jobs/restart-all should return 200", async () => {
+        const cookie = await login();
+        const req = new Request("http://localhost/api/jobs/restart-all", {
+            method: "POST",
+            headers: { Cookie: cookie || "" },
+        });
+        const res = await app.fetch(req);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.success).toBe(true);
+    });
+
+    test("Scheduler endpoints should work", async () => {
+        const cookie = await login();
+        
+        // Pause
+        const pauseReq = new Request("http://localhost/api/jobs/scheduler/pause", {
+            method: "POST",
+            headers: { Cookie: cookie || "" },
+        });
+        let res = await app.fetch(pauseReq);
+        expect(res.status).toBe(200);
+
+        // Status
+        const statusReq = new Request("http://localhost/api/jobs/scheduler/status", {
+            headers: { Cookie: cookie || "" },
+        });
+        res = await app.fetch(statusReq);
+        expect(res.status).toBe(200);
+        let data = await res.json();
+        expect(data.paused).toBe(true);
+
+        // Resume
+        const resumeReq = new Request("http://localhost/api/jobs/scheduler/resume", {
+            method: "POST",
+            headers: { Cookie: cookie || "" },
+        });
+        res = await app.fetch(resumeReq);
+        expect(res.status).toBe(200);
+
+        // Status again
+        res = await app.fetch(statusReq);
+        data = await res.json();
+        expect(data.paused).toBe(false);
+    });
+  });
+
   describe("Security/Authorization", () => {
     test("GET /api/mailboxes should return 401 if not authenticated", async () => {
         const req = new Request("http://localhost/api/mailboxes");

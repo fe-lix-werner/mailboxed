@@ -25,24 +25,24 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 dark:bg-slate-950 transition-colors duration-200">
       <div className="max-w-md w-full">
         <div className="text-center mb-10">
-          <div className="inline-flex p-4 bg-primary-600 rounded-2xl text-white shadow-xl shadow-primary-200 mb-6 rotate-3">
+          <div className="inline-flex p-4 bg-primary-600 rounded-2xl text-white shadow-xl shadow-primary-200 mb-6 rotate-3 dark:shadow-primary-900/20">
             <Mail size={32} />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Mailboxed</h1>
-          <p className="text-slate-500 font-medium">{t('common.login')}</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2 dark:text-white">Mailboxed</h1>
+          <p className="text-slate-500 font-medium dark:text-slate-400">{t('common.login')}</p>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100">
+        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1 dark:text-slate-400">
                 {t('common.email')}
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
                   <Mail size={18} />
                 </div>
                 <input
@@ -55,11 +55,11 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1 dark:text-slate-400">
                 {t('common.password')}
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
                   <Lock size={18} />
                 </div>
                 <input
@@ -72,8 +72,8 @@ export default function Login() {
             </div>
 
             {mutation.isError && (
-              <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-bold flex items-center gap-2 border border-red-100">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+              <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-bold flex items-center gap-2 border border-red-100 dark:bg-red-950/30 dark:border-red-900/30 dark:text-red-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400" />
                 {t('common.loginError')}
               </div>
             )}

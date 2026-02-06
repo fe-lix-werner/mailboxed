@@ -1,15 +1,19 @@
-FROM oven/bun:1.1 AS base
+# --- Runtime stage ---
+FROM oven/bun:1.1 AS runner
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Install dependencies
-COPY package.json bun.lockb ./
-RUN bun install --frozen-lockfile
+# Copy production artifacts from local dist folder
+COPY dist ./dist
+# Copy migrations
+COPY drizzle ./drizzle
+# We need to make sure the server can find static files in dist/static
+ENV CLIENT_DIR=/app/dist/static
 
-# Copy source
-COPY . .
+# Create data dir for sqlite and downloads
+RUN mkdir -p /data
+VOLUME ["/data"]
 
-# Build frontend (to be added later)
-# RUN bun run build:fe
-
+# Expose port and start server
 EXPOSE 3000
-CMD ["bun", "run", "src/index.ts"]
+CMD ["bun", "dist/index.js"]

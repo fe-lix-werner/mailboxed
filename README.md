@@ -31,7 +31,7 @@ DOWNLOAD_ROOT=downloads
 LOG_LEVEL=info
 ```
 
-*Note: `IMAP_CRED_MASTER_KEY` must be a 64-character hex string (32 bytes).*
+*Note: `IMAP_CRED_MASTER_KEY` and `APP_SECRET` are optional and will be automatically generated and stored in a `.secrets.json` file in the same directory as your database if not provided.*
 
 ### Installation & Development
 

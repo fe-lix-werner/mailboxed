@@ -6,9 +6,9 @@ import { eq } from "drizzle-orm";
 
 async function run() {
     const engine = new MailboxEngine();
-    console.log("Starting sync for mailbox 2...");
+    console.log("Starting sync for mailbox 1...");
     try {
-        await engine.sync(2, "manual", true);
+        await engine.sync(1, "manual", true);
         console.log("Sync finished.");
     } catch (e) {
         console.error("Sync failed with error:", e);

@@ -28,7 +28,7 @@ describe("MailboxEngine Integration", () => {
       host: "localhost",
       port: 993,
       username: "user",
-      passwordEnc: encrypt("pass"),
+      passwordEnc: await encrypt("pass"),
       basePath: "test",
       folderListJson: JSON.stringify(["INBOX"]),
       filtersJson: "{}",
@@ -40,6 +40,7 @@ describe("MailboxEngine Integration", () => {
       connect: mock(async () => {}),
       logout: mock(async () => {}),
       getMailboxLock: mock(async () => ({ release: () => {} })),
+      search: mock(async () => [1]),
       fetch: function* () {
         yield {
           uid: 1,
@@ -55,6 +56,7 @@ describe("MailboxEngine Integration", () => {
         };
       },
       download: mock(async () => ({ content: [Buffer.from("hello world")] })),
+      status: mock(async () => ({ uidNext: 2 })),
     };
 
     const engine = new MailboxEngine(() => mockClient as any);
@@ -83,7 +85,7 @@ describe("MailboxEngine Integration", () => {
           host: "localhost",
           port: 993,
           username: "user",
-          passwordEnc: encrypt("pass"),
+          passwordEnc: await encrypt("pass"),
           basePath: "test",
           folderListJson: JSON.stringify(["INBOX"]),
           filtersJson: "{}",
@@ -102,10 +104,14 @@ describe("MailboxEngine Integration", () => {
           connect: mock(async () => {}),
           logout: mock(async () => {}),
           getMailboxLock: mock(async () => ({ release: () => {} })),
-          fetch: function* (criteria: any) {
+          search: mock(async (criteria: any) => {
               capturedCriteria = criteria;
-              // No new messages
+              return [];
+          }),
+          fetch: function* (criteria: any) {
+              // Should not be called if search returns empty
           },
+          status: mock(async () => ({ uidNext: 11 })),
       };
 
       const engine = new MailboxEngine(() => mockClient as any);
@@ -121,7 +127,7 @@ describe("MailboxEngine Integration", () => {
       host: "localhost",
       port: 993,
       username: "user",
-      passwordEnc: encrypt("pass"),
+      passwordEnc: await encrypt("pass"),
       basePath: "test",
       folderListJson: JSON.stringify(["INBOX"]),
       enabled: true,

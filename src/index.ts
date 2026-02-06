@@ -1,11 +1,12 @@
-import { db } from "./db";
+import { db, runMigrations } from "./db";
 import { scheduler } from "./services/scheduler";
 import { logger } from "./services/logger";
-import { hashPassword, verifyPassword, encrypt, decrypt } from "./services/security";
+import { hashPassword, verifyPassword, encrypt, decrypt, getAppSecretValue } from "./services/security";
 import { users, mailboxes, jobs, downloads } from "./db/schema";
 import { eq, desc } from "drizzle-orm";
 import { MailboxEngine } from "./services/mailbox-engine";
 import { exists } from "fs/promises";
+import { join } from "path";
 
 const engine = new MailboxEngine();
 
@@ -91,6 +92,7 @@ export const app = {
         const body = await req.json();
         const user = await db.query.users.findFirst({ where: eq(users.email, body.email) });
         if (user && await verifyPassword(body.password, user.passwordHash)) {
+          const appSecret = await getAppSecretValue();
           return new Response(JSON.stringify({ success: true, user: { email: user.email } }), {
             headers: {
               "Content-Type": "application/json",
@@ -128,7 +130,7 @@ export const app = {
         if (body.id && !body.password) {
           const mailbox = await db.query.mailboxes.findFirst({ where: eq(mailboxes.id, body.id) });
           if (mailbox) {
-            body.password = decrypt(mailbox.passwordEnc);
+            body.password = await decrypt(mailbox.passwordEnc);
           }
         }
         const result = await engine.testConnection(body);
@@ -138,7 +140,11 @@ export const app = {
       // Mailboxes
       if (path === "/api/mailboxes" && req.method === "GET") {
         const result = await db.query.mailboxes.findMany({ where: eq(mailboxes.userId, currentUser.id) });
-        return Response.json(result);
+        const withNextRun = result.map(mb => ({
+          ...mb,
+          nextRun: scheduler.getNextRun(mb.id),
+        }));
+        return Response.json(withNextRun);
       }
 
       if (path === "/api/mailboxes" && req.method === "POST") {
@@ -146,7 +152,7 @@ export const app = {
         const body = sanitizeMailboxPayload(raw);
         // Encrypt password before saving
         if (body.password) {
-          body.passwordEnc = encrypt(body.password);
+          body.passwordEnc = await encrypt(body.password);
           delete body.password;
         }
         
@@ -161,6 +167,12 @@ export const app = {
       if (path.match(/\/api\/mailboxes\/\d+/) && req.method === "GET") {
         const id = parseInt(path.split("/")[3]);
         const result = await db.query.mailboxes.findFirst({ where: eq(mailboxes.id, id) });
+        if (result) {
+          return Response.json({
+            ...result,
+            nextRun: scheduler.getNextRun(result.id),
+          });
+        }
         return Response.json(result);
       }
 
@@ -170,7 +182,7 @@ export const app = {
         const body = sanitizeMailboxPayload(raw);
         
         if (body.password) {
-          body.passwordEnc = encrypt(body.password);
+          body.passwordEnc = await encrypt(body.password);
           delete body.password;
         }
 
@@ -195,6 +207,14 @@ export const app = {
         // Trigger manual sync in background
         engine.sync(id, "manual"); 
         return Response.json({ status: "triggered" });
+      }
+
+      if (path.match(/\/api\/mailboxes\/\d+\/reset/) && req.method === "POST") {
+        const id = parseInt(path.split("/")[3]);
+        await engine.reset(id);
+        // Trigger manual sync in background after reset
+        engine.sync(id, "manual");
+        return Response.json({ status: "reset_and_triggered" });
       }
 
       // Downloads
@@ -260,6 +280,40 @@ export const app = {
         return Response.json(result);
       }
 
+      if (path === "/api/jobs/abort-all" && req.method === "POST") {
+        if (!await authenticate(req)) return new Response("Unauthorized", { status: 401 });
+        engine.abortAll();
+        return Response.json({ success: true });
+      }
+
+      if (path === "/api/jobs/restart-all" && req.method === "POST") {
+        if (!await authenticate(req)) return new Response("Unauthorized", { status: 401 });
+        const allMailboxes = await db.query.mailboxes.findMany({
+          where: eq(mailboxes.enabled, true),
+        });
+        for (const mb of allMailboxes) {
+          engine.sync(mb.id, "manual"); // Run in background
+        }
+        return Response.json({ success: true, count: allMailboxes.length });
+      }
+
+      if (path === "/api/jobs/scheduler/pause" && req.method === "POST") {
+        if (!await authenticate(req)) return new Response("Unauthorized", { status: 401 });
+        scheduler.pause();
+        return Response.json({ success: true });
+      }
+
+      if (path === "/api/jobs/scheduler/resume" && req.method === "POST") {
+        if (!await authenticate(req)) return new Response("Unauthorized", { status: 401 });
+        scheduler.resume();
+        return Response.json({ success: true });
+      }
+
+      if (path === "/api/jobs/scheduler/status" && req.method === "GET") {
+        if (!await authenticate(req)) return new Response("Unauthorized", { status: 401 });
+        return Response.json({ paused: scheduler.isPaused() });
+      }
+
       // Stats
       if (path === "/api/stats" && req.method === "GET") {
         const allDownloads = await db.select({
@@ -281,11 +335,40 @@ export const app = {
         const totalJobs = allJobs.length;
         const successRate = totalJobs > 0 ? (successJobs / totalJobs) * 100 : 0;
 
-        // MIME breakdown
+        // MIME breakdown (friendly labels)
+        const toFriendlyType = (mime?: string): string => {
+          if (!mime) return 'Unknown';
+          const [type, subtypeRaw] = mime.split('/');
+          const subtype = (subtypeRaw || '').toLowerCase();
+
+          // Common explicit mappings
+          if (subtype === 'pdf') return 'PDF';
+          if (subtype === 'jpeg' || subtype === 'jpg') return 'JPEG';
+          if (subtype === 'png') return 'PNG';
+          if (subtype === 'gif') return 'GIF';
+          if (subtype === 'svg+xml') return 'SVG';
+          if (subtype === 'plain') return 'Text';
+          if (subtype === 'html') return 'HTML';
+          if (subtype === 'csv') return 'CSV';
+          if (subtype.includes('zip')) return 'ZIP';
+          if (subtype.includes('rar')) return 'RAR';
+          if (subtype.includes('7z')) return '7‑Zip';
+          if (subtype.includes('msword') || subtype.includes('wordprocessingml')) return 'Word';
+          if (subtype.includes('vnd.ms-excel') || subtype.includes('spreadsheetml')) return 'Excel';
+          if (subtype.includes('vnd.ms-powerpoint') || subtype.includes('presentationml')) return 'PowerPoint';
+          if (subtype === 'json') return 'JSON';
+          if (subtype === 'xml') return 'XML';
+          if (subtype === 'octet-stream') return 'Binary';
+
+          // Fallbacks
+          if (subtype) return subtype.toUpperCase();
+          return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Unknown';
+        };
+
         const mimeBreakdown: Record<string, number> = {};
         allDownloads.forEach(d => {
-          const type = d.mime?.split('/')[0] || 'unknown';
-          mimeBreakdown[type] = (mimeBreakdown[type] || 0) + 1;
+          const label = toFriendlyType(d.mime || undefined);
+          mimeBreakdown[label] = (mimeBreakdown[label] || 0) + 1;
         });
 
         // Downloads over time (last 30 days)
@@ -316,6 +399,11 @@ export const app = {
           .map(([date, count]) => ({ date, count }))
           .sort((a, b) => a.date.localeCompare(b.date));
 
+        const lastDownloads = await db.query.downloads.findMany({
+          orderBy: [desc(downloads.downloadedAt)],
+          limit: 10,
+        });
+
         return Response.json({
           totalFiles,
           totalSize,
@@ -323,8 +411,28 @@ export const app = {
           activeMailboxes,
           successRate: Math.round(successRate),
           mimeBreakdown: Object.entries(mimeBreakdown).map(([name, value]) => ({ name, value })),
-          history
+          history,
+          lastDownloads
         });
+      }
+    }
+
+    // Static frontend (SPA) serving
+    if (req.method === "GET" && !path.startsWith("/api")) {
+      const clientDir = process.env.CLIENT_DIR || "static";
+      const rel = path === "/" ? "index.html" : path.slice(1);
+      const fullPath = join(clientDir, rel);
+
+      try {
+        if (await exists(fullPath)) {
+          return new Response(Bun.file(fullPath));
+        }
+      } catch {}
+
+      // SPA fallback
+      const indexHtml = join(clientDir, "index.html");
+      if (await exists(indexHtml)) {
+        return new Response(Bun.file(indexHtml), { headers: { "Content-Type": "text/html" } });
       }
     }
 
@@ -333,30 +441,37 @@ export const app = {
 };
 
 if (process.env.NODE_ENV !== "test") {
-  const server = Bun.serve({
-    port: parseInt(process.env.PORT || "3000"),
-    fetch: app.fetch,
-  });
-
-  logger.info(`Server started on http://localhost:${server.port}`);
-
-  // Initialize Scheduler
-  scheduler.init();
-}
-
-// Seed initial user if none exists
-if (process.env.NODE_ENV !== "test") {
   (async () => {
+    // Run migrations before anything else
+    try {
+      await runMigrations();
+    } catch (err) {
+      logger.error(err, "Failed to run migrations");
+      process.exit(1);
+    }
+
+    // Seed initial user if none exists
     const userCount = (await db.select().from(users)).length;
     if (userCount === 0) {
-      const email = "admin@example.com";
-      const password = "admin";
+      const email = process.env.DEFAULT_USER_EMAIL || "admin@example.com";
+      const password = process.env.DEFAULT_USER_PASSWORD || "admin";
       const passwordHash = await hashPassword(password);
       await db.insert(users).values({
         email,
         passwordHash,
       });
-      logger.info({ email, password }, "Created initial admin user. Please change password after login.");
+      const pw = password.replace(/./g, "*");
+      logger.info({ email, pw }, "Created initial admin user. Please change password after login.");
     }
+
+    const server = Bun.serve({
+      port: parseInt(process.env.PORT || "3000"),
+      fetch: app.fetch,
+    });
+
+    logger.debug(`Server started on http://localhost:${server.port}`);
+
+    // Initialize Scheduler
+    scheduler.init();
   })();
 }

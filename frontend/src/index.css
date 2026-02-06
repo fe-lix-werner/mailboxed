@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-primary-50: #eff6ff;
@@ -16,7 +17,8 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-200;
+    @apply dark:bg-slate-950 dark:text-slate-100;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
   a, button {
@@ -39,22 +41,27 @@
 
 @utility btn-primary {
   @apply btn bg-primary-600 text-white hover:bg-primary-700 shadow-sm hover:shadow-md active:scale-[0.98];
+  @apply dark:bg-primary-500 dark:hover:bg-primary-600 dark:shadow-primary-900/20;
 }
 
 @utility btn-secondary {
   @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm active:scale-[0.98];
+  @apply dark:bg-slate-900 dark:text-slate-200 dark:border-slate-800 dark:hover:bg-slate-800;
 }
 
 @utility btn-danger {
   @apply btn bg-white text-red-600 border border-red-100 hover:bg-red-50 active:scale-[0.98];
+  @apply dark:bg-slate-900 dark:text-red-400 dark:border-red-900/30 dark:hover:bg-red-950/30;
 }
 
 @utility card {
-  @apply bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden;
+  @apply bg-white rounded-2xl border border-slate-200/50 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden;
+  @apply dark:bg-slate-900 dark:border-slate-800 dark:shadow-none;
 }
 
 @utility input {
   @apply w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none transition-all duration-200 placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500;
+  @apply dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:ring-primary-500/30;
 }
 
 @utility badge {
@@ -63,4 +70,5 @@
 
 @utility glass-card {
   @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+  @apply dark:bg-slate-900/80 dark:border-slate-800/50;
 }
