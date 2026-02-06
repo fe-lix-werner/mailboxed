@@ -40,7 +40,7 @@ describe("MailboxEngine Integration", () => {
       connect: mock(async () => {}),
       logout: mock(async () => {}),
       getMailboxLock: mock(async () => ({ release: () => {} })),
-      listMessages: async function* () {
+      fetch: function* () {
         yield {
           uid: 1,
           envelope: { date: new Date(), subject: "Test Attachment", from: [{ address: "sender@test.com" }] },
@@ -54,11 +54,11 @@ describe("MailboxEngine Integration", () => {
           }
         };
       },
-      download: mock(async () => ({ content: Buffer.from("hello world") })),
+      download: mock(async () => ({ content: [Buffer.from("hello world")] })),
     };
 
     const engine = new MailboxEngine(() => mockClient as any);
-    await engine.sync(mailbox.id, "manual");
+    await engine.sync(mailbox.id, "manual", true);
 
     // 3. Assertions
     const jobRecord = await db.query.jobs.findFirst();
@@ -102,14 +102,14 @@ describe("MailboxEngine Integration", () => {
           connect: mock(async () => {}),
           logout: mock(async () => {}),
           getMailboxLock: mock(async () => ({ release: () => {} })),
-          listMessages: async function* (folder: string, criteria: any) {
+          fetch: function* (criteria: any) {
               capturedCriteria = criteria;
               // No new messages
           },
       };
 
       const engine = new MailboxEngine(() => mockClient as any);
-      await engine.sync(mailbox.id, "manual");
+      await engine.sync(mailbox.id, "manual", true);
 
       expect(capturedCriteria).toEqual({ uid: "11:*" });
   });
@@ -139,7 +139,7 @@ describe("MailboxEngine Integration", () => {
     const originalTimeout = global.setTimeout;
     (global as any).setTimeout = (cb: any) => cb();
 
-    await engine.sync(mailbox.id, "manual");
+    await engine.sync(mailbox.id, "manual", true);
 
     (global as any).setTimeout = originalTimeout;
 

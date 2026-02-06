@@ -15,7 +15,7 @@ async function handleResponse(response: Response) {
   if (!response.ok) {
     if (response.status === 401) {
       // Handle unauthorized
-      window.location.href = '/login';
+      // window.location.href = '/login';
     }
     const error = await response.text();
     throw new Error(error || response.statusText);
@@ -50,7 +50,12 @@ export const api = {
         body: JSON.stringify(data),
       }).then(handleResponse),
     delete: (id: number) => fetch(`${API_BASE}/mailboxes/${id}`, { method: 'DELETE' }).then(handleResponse),
-    test: (id: number) => fetch(`${API_BASE}/mailboxes/${id}/test-connection`, { method: 'POST' }).then(handleResponse),
+    test: (data: any) => 
+      fetch(`${API_BASE}/mailboxes/test-connection`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).then(handleResponse),
     sync: (id: number) => fetch(`${API_BASE}/mailboxes/${id}/sync`, { method: 'POST' }).then(handleResponse),
   },
   downloads: {
@@ -64,5 +69,8 @@ export const api = {
       const searchParams = new URLSearchParams(params);
       return fetch(`${API_BASE}/jobs?${searchParams}`).then(handleResponse);
     },
+  },
+  stats: {
+    get: () => fetch(`${API_BASE}/stats`).then(handleResponse),
   }
 };

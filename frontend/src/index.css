@@ -19,9 +19,13 @@
     @apply bg-slate-50 text-slate-900 antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+  a, button {
+    @apply cursor-pointer;
+  }
 }
 
 @utility btn {
+  @apply cursor-pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;

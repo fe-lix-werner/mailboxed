@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Search, Download as DownloadIcon, Filter, ExternalLink, Mail, User, Calendar, RefreshCcw } from 'lucide-react';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 export default function Downloads() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const { data: downloads, isLoading } = useQuery({
     queryKey: ['downloads', { q: search }],
@@ -15,7 +17,7 @@ export default function Downloads() {
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="flex flex-col items-center gap-4">
         <RefreshCcw className="animate-spin text-primary-500" size={32} />
-        <p className="text-slate-500 font-medium">Scanning archive...</p>
+        <p className="text-slate-500 font-medium">{t('common.loading')}</p>
       </div>
     </div>
   );
@@ -24,18 +26,20 @@ export default function Downloads() {
     <div className="p-10 max-w-7xl mx-auto space-y-10">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Downloads</h1>
-          <p className="text-slate-500 mt-2 text-lg">History of all attachments saved to disk.</p>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">{t('downloads.title')}</h1>
+          <p className="text-slate-500 mt-2 text-lg">{t('downloads.subtitle')}</p>
         </div>
-        
-        <div className="relative flex-1 md:max-w-md group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
+
+        <div className="relative group max-w-md w-full">
+          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <Search size={20} className="text-slate-400 group-focus-within:text-primary-500 transition-colors" />
+          </div>
           <input 
             type="text"
-            placeholder="Search filename, subject, or sender..."
+            placeholder={t('downloads.searchPlaceholder')}
+            className="input pl-12 h-12 bg-white/50 focus:bg-white"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="input pl-12 h-12 shadow-sm focus:shadow-md"
           />
         </div>
       </header>
@@ -45,10 +49,10 @@ export default function Downloads() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">File Details</th>
-                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Source Message</th>
-                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Size</th>
-                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Saved At</th>
+                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('downloads.fileDetails')}</th>
+                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('downloads.sourceMessage')}</th>
+                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('downloads.size')}</th>
+                <th className="px-8 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">{t('downloads.savedAt')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -103,8 +107,8 @@ export default function Downloads() {
                         <DownloadIcon size={32} className="text-slate-200" />
                       </div>
                       <div>
-                        <p className="text-lg font-bold text-slate-900">No downloads found</p>
-                        <p className="text-sm font-medium">Try adjusting your search or check your mailbox sync status.</p>
+                        <p className="text-lg font-bold text-slate-900">{t('downloads.noDownloads')}</p>
+                        <p className="text-sm font-medium">{t('downloads.noDownloadsSubtitle')}</p>
                       </div>
                     </div>
                   </td>

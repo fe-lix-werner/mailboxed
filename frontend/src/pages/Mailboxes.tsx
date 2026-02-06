@@ -3,8 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { Plus, Settings, Trash2, CheckCircle2, XCircle, Play, Pause, RefreshCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function Mailboxes() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: mailboxes, isLoading } = useQuery({
     queryKey: ['mailboxes'],
@@ -26,7 +28,7 @@ export default function Mailboxes() {
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="flex flex-col items-center gap-4">
         <RefreshCcw className="animate-spin text-primary-500" size={32} />
-        <p className="text-slate-500 font-medium">Loading Mailboxes...</p>
+        <p className="text-slate-500 font-medium">{t('common.loading')}</p>
       </div>
     </div>
   );
@@ -35,15 +37,15 @@ export default function Mailboxes() {
     <div className="p-10 max-w-7xl mx-auto space-y-10">
       <header className="flex justify-between items-end">
         <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Mailboxes</h1>
-          <p className="text-slate-500 mt-2 text-lg">Manage your IMAP connections and sync rules.</p>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">{t('mailboxes.title')}</h1>
+          <p className="text-slate-500 mt-2 text-lg">{t('mailboxes.subtitle')}</p>
         </div>
         <Link 
           to="/mailboxes/new"
           className="btn-primary gap-2 h-12 px-6"
         >
           <Plus size={20} />
-          Add Mailbox
+          {t('mailboxes.addMailbox')}
         </Link>
       </header>
 
@@ -75,9 +77,9 @@ export default function Mailboxes() {
 
             <div className="flex items-center gap-4">
               <div className="flex flex-col items-end mr-6">
-                <span className="text-[10px] uppercase tracking-widest font-extrabold text-slate-400">Status</span>
+                <span className="text-[10px] uppercase tracking-widest font-extrabold text-slate-400">{t('common.status')}</span>
                 <span className={`text-sm font-bold ${mailbox.enabled ? 'text-green-600' : 'text-slate-400'}`}>
-                  {mailbox.enabled ? 'ACTIVE' : 'PAUSED'}
+                  {mailbox.enabled ? t('mailboxes.active') : t('mailboxes.paused')}
                 </span>
               </div>
               
@@ -97,19 +99,19 @@ export default function Mailboxes() {
                 <Link 
                   to={`/mailboxes/${mailbox.id}`}
                   className="btn-secondary w-11 h-11 p-0 rounded-xl hover:border-primary-200 hover:text-primary-600 transition-all duration-300"
-                  title="Edit Settings"
+                  title={t('common.edit')}
                 >
                   <Settings size={20} />
                 </Link>
 
                 <button 
                   onClick={() => {
-                    if (confirm('Are you sure you want to delete this mailbox? All history will be kept but sync will stop.')) {
+                    if (confirm(t('common.confirmDelete'))) {
                       deleteMutation.mutate(mailbox.id);
                     }
                   }}
                   className="btn-danger w-11 h-11 p-0 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-300"
-                  title="Delete Mailbox"
+                  title={t('common.delete')}
                 >
                   <Trash2 size={20} />
                 </button>
@@ -123,14 +125,14 @@ export default function Mailboxes() {
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
               <Settings size={40} className="text-slate-200" />
             </div>
-            <h3 className="text-2xl font-bold text-slate-900">No mailboxes yet</h3>
-            <p className="text-slate-500 mb-8 max-w-sm">Connect your first IMAP account to start automatically archiving email attachments.</p>
+            <h3 className="text-2xl font-bold text-slate-900">{t('mailboxes.noMailboxes')}</h3>
+            <p className="text-slate-500 mb-8 max-w-sm">{t('mailboxes.connectFirst')}</p>
             <Link 
               to="/mailboxes/new"
               className="btn-primary px-8 py-3 rounded-xl gap-2 shadow-lg shadow-primary-100"
             >
               <Plus size={20} />
-              Connect a Mailbox
+              {t('mailboxes.connectMailbox')}
             </Link>
           </div>
         )}

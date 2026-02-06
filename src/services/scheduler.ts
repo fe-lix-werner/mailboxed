@@ -36,7 +36,15 @@ export class Scheduler {
     // but better use the "interval" feature or a simple setInterval if it's just seconds.
     // Actually Croner supports `* * * * * *` for seconds if enabled.
     
-    const job = new Cron(`*/${intervalSec} * * * * *`, async () => {
+    let cronPattern: string;
+    if (intervalSec < 60) {
+      cronPattern = `*/${intervalSec} * * * * *`;
+    } else {
+      const minutes = Math.floor(intervalSec / 60);
+      cronPattern = `0 */${minutes} * * * *`;
+    }
+    
+    const job = new Cron(cronPattern, async () => {
       logger.info({ mailboxId }, "Starting scheduled sync");
       await this.engine.sync(mailboxId, "poll");
     });

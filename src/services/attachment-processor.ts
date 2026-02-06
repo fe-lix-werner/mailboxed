@@ -1,7 +1,6 @@
 import { join } from "path";
 import { mkdir, writeFile } from "fs/promises";
 import { createHash } from "crypto";
-import { format } from "date-fns";
 import { logger } from "./logger";
 import { db } from "../db";
 import { downloads } from "../db/schema";
@@ -56,16 +55,12 @@ export class AttachmentProcessor {
       const hash = createHash("sha256").update(info.content).digest("hex");
 
       // 4. Determine path
-      const date = info.messageDate || new Date();
-      const subDir = join(this.mailboxName, format(date, "yyyy"), format(date, "MM"));
-      const fullDir = join(process.env.DOWNLOAD_ROOT || "downloads", this.basePath, subDir);
+      const fullDir = join(process.env.DOWNLOAD_ROOT || "downloads", this.basePath, this.mailboxName);
       
       await mkdir(fullDir, { recursive: true });
 
-      let targetPath = join(fullDir, info.filename);
-      // Handle collision
-      // In a real app, we'd check if file exists and append hash
-      // For now, let's keep it simple as per requirements
+      const safeName = this.generateSafeFilename(info);
+      let targetPath = join(fullDir, safeName);
       
       // 5. Save file
       await writeFile(targetPath, info.content);
@@ -94,13 +89,46 @@ export class AttachmentProcessor {
     }
   }
 
+  private generateSafeFilename(info: AttachmentInfo): string {
+    const sanitize = (s: string | undefined, max: number) => {
+      if (!s) return "unknown";
+      return s
+        .replace(/[^a-z0-9]/gi, "_")
+        .replace(/_+/g, "_")
+        .substring(0, max)
+        .replace(/^_|_$/g, "");
+    };
+
+    const sender = sanitize(info.from?.split("@")[0], 30);
+    const subject = sanitize(info.subject, 50);
+    
+    const lastDotIndex = info.filename.lastIndexOf(".");
+    const baseName = lastDotIndex === -1 ? info.filename : info.filename.substring(0, lastDotIndex);
+    const ext = lastDotIndex === -1 ? "" : info.filename.substring(lastDotIndex); // includes the dot
+    
+    const filename = sanitize(baseName, 50);
+    const mailboxId = this.mailboxId.toString();
+    const messageId = info.messageUid.toString();
+
+    // <sender>-<subject>-<filename>-<mailbox-id>-<message-id>.<file-ext>
+    return `${sender}-${subject}-${filename}-${mailboxId}-${messageId}${ext}`;
+  }
+
   private matchesFilters(info: AttachmentInfo): boolean {
+    const ext = info.filename.split(".").pop()?.toLowerCase();
+    
     if (this.filters.extensions?.length) {
-      const ext = info.filename.split(".").pop()?.toLowerCase();
       if (!ext || !this.filters.extensions.includes(ext)) return false;
     }
+
     if (this.filters.mimes?.length) {
       const matches = this.filters.mimes.some(m => {
+        // Relaxed handling: if extension matches a known MIME type, allow it
+        if (m === "application/pdf" && ext === "pdf") return true;
+        if (m === "image/jpeg" && (ext === "jpg" || ext === "jpeg")) return true;
+        if (m === "image/png" && ext === "png") return true;
+        if (m === "image/gif" && ext === "gif") return true;
+
         if (m.endsWith("/*")) {
           const prefix = m.replace("/*", "");
           return info.mime.startsWith(prefix);
