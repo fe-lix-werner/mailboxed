@@ -5,7 +5,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./data:/data
+      - data:/data
     environment:
       - DB_PATH=/data/mailboxed.sqlite
       - DOWNLOAD_ROOT=/data/downloads
