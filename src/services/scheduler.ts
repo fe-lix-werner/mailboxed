@@ -8,7 +8,7 @@ import { MailboxEngine } from "./mailbox-engine";
 export class Scheduler {
 	private jobs: Map<number, Cron> = new Map();
 	private engine: MailboxEngine;
-	private paused: boolean = false;
+	private paused = false;
 
 	constructor(engine?: MailboxEngine) {
 		this.engine = engine || new MailboxEngine();
@@ -83,6 +83,14 @@ export class Scheduler {
 			this.jobs.get(mailboxId)?.stop();
 			this.jobs.delete(mailboxId);
 		}
+	}
+
+	async cleanupIncompleteJobs() {
+		await this.engine.cleanupIncompleteJobs();
+	}
+
+	async abortAll() {
+		await this.engine.abortAll();
 	}
 }
 

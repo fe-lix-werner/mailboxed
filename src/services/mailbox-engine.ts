@@ -27,22 +27,66 @@ export class MailboxEngine {
 
 	constructor(private clientFactory?: (options: ImapFlowOptions) => ImapFlow) {}
 
-	abort(mailboxId: number) {
+	async abort(mailboxId: number) {
 		const controller = this.activeSyncs.get(mailboxId);
 		if (controller) {
 			logger.info({ mailboxId }, "Aborting active sync job");
 			controller.abort();
 			this.activeSyncs.delete(mailboxId);
+
+			// Update database status
+			try {
+				await db
+					.update(jobs)
+					.set({
+						status: "cancelled",
+						finishedAt: new Date().toISOString(),
+						errorText: "Aborted by user",
+					})
+					.where(
+						and(
+							eq(jobs.mailboxId, mailboxId),
+							inArray(jobs.status, ["queued", "running"]),
+						),
+					);
+			} catch (err) {
+				logger.error(
+					{ mailboxId, err },
+					"Failed to update job status after abort",
+				);
+			}
 		}
 	}
 
-	abortAll() {
+	async abortAll() {
 		logger.info(
 			{ activeCount: this.activeSyncs.size },
 			"Aborting all active sync jobs",
 		);
-		for (const [_mailboxId, controller] of this.activeSyncs.entries()) {
+		for (const [mailboxId, controller] of this.activeSyncs.entries()) {
 			controller.abort();
+
+			// Update database status
+			try {
+				await db
+					.update(jobs)
+					.set({
+						status: "cancelled",
+						finishedAt: new Date().toISOString(),
+						errorText: "Aborted by system shutdown",
+					})
+					.where(
+						and(
+							eq(jobs.mailboxId, mailboxId),
+							inArray(jobs.status, ["queued", "running"]),
+						),
+					);
+			} catch (err) {
+				logger.error(
+					{ mailboxId, err },
+					"Failed to update job status after abortAll",
+				);
+			}
 		}
 		this.activeSyncs.clear();
 	}
@@ -508,6 +552,30 @@ export class MailboxEngine {
 					// ignore logout errors if connection was already dead
 				}
 			}
+		}
+	}
+
+	async cleanupIncompleteJobs() {
+		try {
+			// Find all 'queued' or 'running' jobs to mark them as cancelled
+			const result = await db
+				.update(jobs)
+				.set({
+					status: "cancelled",
+					finishedAt: new Date().toISOString(),
+					errorText: "Backend restarted or job aborted",
+				})
+				.where(inArray(jobs.status, ["queued", "running"]))
+				.returning();
+
+			if (result.length > 0) {
+				logger.info(
+					{ cancelledCount: result.length },
+					"Cleaned up unfinished jobs",
+				);
+			}
+		} catch (err) {
+			logger.error({ err }, "Failed to cleanup unfinished jobs");
 		}
 	}
 

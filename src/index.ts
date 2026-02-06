@@ -561,5 +561,21 @@ if (process.env.NODE_ENV !== "test") {
 
 		// Initialize Scheduler
 		scheduler.init();
+
+		// Cleanup incomplete jobs on startup
+		await scheduler.cleanupIncompleteJobs();
+
+		// Graceful shutdown
+		const shutdown = async () => {
+			logger.info("Shutting down...");
+			scheduler.pause();
+			await scheduler.abortAll();
+			// We give it a moment to finish any pending DB updates
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			process.exit(0);
+		};
+
+		process.on("SIGTERM", shutdown);
+		process.on("SIGINT", shutdown);
 	})();
 }
