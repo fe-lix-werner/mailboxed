@@ -101,9 +101,18 @@ export const app = {
 		// Health check
 		if (path === "/healthz") return new Response("OK");
 
-		// Logo
 		if (path === "/mailboxed.webp") {
-			return new Response(Bun.file("mailboxed.webp"));
+			const clientDir = process.env.CLIENT_DIR || "static";
+			const fullPath = join(clientDir, "mailboxed.webp");
+			try {
+				if (await exists(fullPath)) {
+					return new Response(Bun.file(fullPath));
+				}
+			} catch {}
+			// Fallback to root if not in static (shouldn't happen in Docker but good for dev)
+			if (await exists("mailboxed.webp")) {
+				return new Response(Bun.file("mailboxed.webp"));
+			}
 		}
 
 		// API Routes
@@ -515,14 +524,20 @@ export const app = {
 				if (await exists(fullPath)) {
 					return new Response(Bun.file(fullPath));
 				}
-			} catch {}
+			} catch (err) {
+				logger.error({ err, fullPath }, "Error serving static file");
+			}
 
 			// SPA fallback
 			const indexHtml = join(clientDir, "index.html");
-			if (await exists(indexHtml)) {
-				return new Response(Bun.file(indexHtml), {
-					headers: { "Content-Type": "text/html" },
-				});
+			try {
+				if (await exists(indexHtml)) {
+					return new Response(Bun.file(indexHtml), {
+						headers: { "Content-Type": "text/html" },
+					});
+				}
+			} catch (err) {
+				logger.error({ err, indexHtml }, "Error serving SPA fallback");
 			}
 		}
 
