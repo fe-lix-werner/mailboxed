@@ -78,3 +78,7 @@ Volumes are mapped to:
 - **Backend**: Bun, Drizzle ORM, SQLite, ImapFlow, Croner, Pino.
 - **Frontend**: React 19, Vite, TanStack Query, React Router, Tailwind CSS, Lucide Icons.
 - **Security**: Argon2 (passwords), AES-256-GCM (IMAP credentials).
+
+## License
+
+MIT
