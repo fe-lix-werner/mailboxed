@@ -66,15 +66,29 @@ bun build
 
 ## Production Deployment
 
-Use Docker Compose:
+### Docker (Recommended)
+
+The easiest way to run Mailboxed is using the pre-built Docker image:
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -v ./data:/data \
+  -e APP_SECRET=your-secret \
+  ghcr.io/YOUR_GITHUB_USERNAME/mailboxed:main
+```
+
+Replace `YOUR_GITHUB_USERNAME` with your GitHub username (lowercase).
+
+### Docker Compose
+
+Alternatively, use the provided `docker-compose.yml`:
 
 ```bash
 docker-compose up -d
 ```
 
-Volumes are mapped to:
-- `/data/db`: SQLite database
-- `/data/downloads`: Downloaded attachments
+Volumes are mapped to `/data` in the container, which contains both the SQLite database and the downloaded attachments.
 
 ## Tech Stack
 

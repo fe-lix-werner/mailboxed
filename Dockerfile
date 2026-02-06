@@ -1,12 +1,31 @@
+# --- Build stage ---
+FROM oven/bun:1.1 AS builder
+WORKDIR /app
+
+# Copy root package files
+COPY package.json bun.lock ./
+
+# Copy frontend package files
+COPY frontend/package.json ./frontend/
+
+# Install dependencies
+RUN bun install
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN bun run build
+
 # --- Runtime stage ---
-FROM oven/bun:1.1 AS runner
+FROM oven/bun:1.1-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy production artifacts from local dist folder
-COPY dist ./dist
+# Copy production artifacts from builder stage
+COPY --from=builder /app/dist ./dist
 # Copy migrations
-COPY drizzle ./drizzle
+COPY --from=builder /app/drizzle ./drizzle
 # We need to make sure the server can find static files in dist/static
 ENV CLIENT_DIR=/app/dist/static
 
