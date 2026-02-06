@@ -1,7 +1,7 @@
 services:
   mailboxed:
     # build: .
-    image: ghcr.io/fe-lix-werner/mailboxed:main
+    image: ghcr.io/fe-lix-werner/mailboxed:master
     ports:
       - "3000:3000"
     volumes:
@@ -11,8 +11,6 @@ services:
       - DOWNLOAD_ROOT=/data/downloads
       - DEFAULT_USER_EMAIL=${DEFAULT_USER_EMAIL:-admin@example.com}
       - DEFAULT_USER_PASSWORD=${DEFAULT_USER_PASSWORD:-admin}
-      - APP_SECRET=${APP_SECRET:-}
-      - IMAP_CRED_MASTER_KEY=${IMAP_CRED_MASTER_KEY:-}
       - LOG_LEVEL=${LOG_DEBUG:-debug}
     healthcheck:
       test: ["CMD", "bun", "-e", "await fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
