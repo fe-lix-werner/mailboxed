@@ -1,7 +1,7 @@
 services:
   mailboxed:
     # build: .
-    image: ghcr.io/YOUR_GITHUB_USERNAME/mailboxed:main
+    image: ghcr.io/fe-lix-werner/mailboxed:main
     ports:
       - "3000:3000"
     volumes:
