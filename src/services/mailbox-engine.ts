@@ -60,11 +60,16 @@ export class MailboxEngine {
     const client = this.clientFactory ? this.clientFactory(clientOptions) : new ImapFlow(clientOptions);
     try {
       await client.connect();
-      await client.logout();
-      return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
+
+    try {
+      await client.logout();
+    } catch (logoutErr) {
+      // ignore logout errors
+    }
+    return { success: true };
   }
 
   async sync(mailboxId: number, trigger: "poll" | "manual" = "poll", force: boolean = false) {
@@ -147,11 +152,11 @@ export class MailboxEngine {
       disableAutoIdle: true,
     };
 
-    const client = this.clientFactory ? this.clientFactory(clientOptions) : new ImapFlow(clientOptions);
-
+    let client: ImapFlow | undefined;
     try {
       while (attempt < maxRetries && !connected) {
         try {
+          client = this.clientFactory ? this.clientFactory(clientOptions) : new ImapFlow(clientOptions);
           await client.connect();
           connected = true;
         } catch (connErr: any) {
@@ -161,6 +166,10 @@ export class MailboxEngine {
           logger.warn({ mailboxId, attempt, delay }, "Connection failed, retrying...");
           await new Promise(resolve => setTimeout(resolve, delay));
         }
+      }
+
+      if (!client) {
+        throw new Error("Failed to initialize IMAP client");
       }
 
       const folders = JSON.parse(mailbox.folderListJson) as string[];
@@ -403,7 +412,13 @@ export class MailboxEngine {
       await this.pruneJobs();
     } finally {
       this.activeSyncs.delete(mailboxId);
-      await client.logout();
+      if (client) {
+        try {
+          await client.logout();
+        } catch (logoutErr) {
+          // ignore logout errors if connection was already dead
+        }
+      }
     }
   }
 
@@ -462,7 +477,11 @@ export class MailboxEngine {
         lock.release();
       }
     } finally {
-      await client.logout();
+      try {
+        await client.logout();
+      } catch (logoutErr) {
+        // ignore
+      }
     }
   }
 
