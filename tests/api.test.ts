@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 import { db } from "../src/db";
 import { mailboxes, users } from "../src/db/schema";
 import { app } from "../src/index";
@@ -73,6 +74,55 @@ describe("API Endpoints", () => {
 			const res = await app.fetch(req);
 			expect(res.status).toBe(200);
 			expect(res.headers.get("Set-Cookie")).toContain("Max-Age=0");
+		});
+
+		test("PUT /api/auth/profile should update user details", async () => {
+			const cookie = await login();
+			const req = new Request("http://localhost/api/auth/profile", {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+					Cookie: cookie || "",
+				},
+				body: JSON.stringify({
+					email: "newemail@example.com",
+					password: "newpassword123",
+				}),
+			});
+			const res = await app.fetch(req);
+			expect(res.status).toBe(200);
+			const data = (await res.json()) as any;
+			expect(data.success).toBe(true);
+			expect(data.email).toBe("newemail@example.com");
+
+			const inDb = await db.query.users.findFirst({
+				where: eq(users.id, 1),
+			});
+			expect(inDb?.email).toBe("newemail@example.com");
+		});
+
+		test("PUT /api/auth/profile should return 400 if email already taken", async () => {
+			// Create another user
+			await db.insert(users).values({
+				id: 2,
+				email: "other@example.com",
+				passwordHash: "hash",
+			});
+
+			const cookie = await login();
+			const req = new Request("http://localhost/api/auth/profile", {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+					Cookie: cookie || "",
+				},
+				body: JSON.stringify({
+					email: "other@example.com",
+				}),
+			});
+			const res = await app.fetch(req);
+			expect(res.status).toBe(400);
+			expect(await res.text()).toBe("Email already taken");
 		});
 	});
 

@@ -155,6 +155,35 @@ export const app = {
 				return new Response("Unauthorized", { status: 401 });
 			}
 
+			if (path === "/api/auth/profile" && req.method === "PUT") {
+				const user = await authenticate(req);
+				if (!user) return new Response("Unauthorized", { status: 401 });
+
+				const body = (await req.json()) as any;
+				const updates: any = {};
+
+				if (body.email) {
+					// Check if email is already taken
+					const existing = await db.query.users.findFirst({
+						where: eq(users.email, body.email),
+					});
+					if (existing && existing.id !== user.id) {
+						return new Response("Email already taken", { status: 400 });
+					}
+					updates.email = body.email;
+				}
+
+				if (body.password) {
+					updates.passwordHash = await hashPassword(body.password);
+				}
+
+				if (Object.keys(updates).length > 0) {
+					await db.update(users).set(updates).where(eq(users.id, user.id));
+				}
+
+				return Response.json({ success: true, email: updates.email || user.email });
+			}
+
 			// Everything else requires auth
 			const currentUser = await authenticate(req);
 			if (!currentUser) return new Response("Unauthorized", { status: 401 });

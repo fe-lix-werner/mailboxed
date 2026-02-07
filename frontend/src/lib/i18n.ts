@@ -46,6 +46,7 @@ i18n
 						confirmReset:
 							"Are you sure you want to reset the sync state? This will delete the internal tracking of synced messages, causing the next sync to re-examine all emails. No downloaded files will be deleted.",
 						resetSync: "Reset Sync State",
+						profile: "Profile",
 					},
 					dashboard: {
 						title: "Dashboard",
@@ -173,6 +174,17 @@ i18n
 						connectionFailed: "Connection Failed",
 						resetSuccess: "Mailbox sync state reset successfully",
 					},
+					profile: {
+						title: "Admin Profile",
+						subtitle: "Manage your account credentials.",
+						updateSuccess: "Profile updated successfully",
+						updateError: "Failed to update profile",
+						changeEmail: "Change Email",
+						changePassword: "Change Password",
+						newPassword: "New Password",
+						confirmPassword: "Confirm Password",
+						passwordMismatch: "Passwords do not match",
+					},
 				},
 			},
 			de: {
@@ -212,6 +224,7 @@ i18n
 						confirmReset:
 							"Sind Sie sicher, dass Sie den Synchronisationsstatus zurücksetzen möchten? Dies löscht die interne Verfolgung synchronisierter Nachrichten, sodass beim nächsten Sync alle E-Mails erneut geprüft werden. Heruntergeladene Dateien werden nicht gelöscht.",
 						resetSync: "Sync-Status zurücksetzen",
+						profile: "Profil",
 					},
 					dashboard: {
 						title: "Dashboard",
@@ -338,6 +351,17 @@ i18n
 						connectionSuccessful: "Verbindung erfolgreich",
 						connectionFailed: "Verbindung fehlgeschlagen",
 						resetSuccess: "Synchronisationsstatus erfolgreich zurückgesetzt",
+					},
+					profile: {
+						title: "Admin-Profil",
+						subtitle: "Verwalten Sie Ihre Kontodaten.",
+						updateSuccess: "Profil erfolgreich aktualisiert",
+						updateError: "Profilaktualisierung fehlgeschlagen",
+						changeEmail: "E-Mail ändern",
+						changePassword: "Passwort ändern",
+						newPassword: "Neues Passwort",
+						confirmPassword: "Passwort bestätigen",
+						passwordMismatch: "Passwörter stimmen nicht überein",
 					},
 				},
 			},

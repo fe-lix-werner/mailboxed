@@ -9,6 +9,7 @@ import {
 	RefreshCcw,
 	Settings,
 	Sun,
+	User,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,6 +26,7 @@ import Downloads from "./pages/Downloads";
 import Login from "./pages/Login";
 import MailboxEditor from "./pages/MailboxEditor";
 import Mailboxes from "./pages/Mailboxes";
+import Profile from "./pages/Profile";
 
 export default function App() {
 	const navigate = useNavigate();
@@ -70,6 +72,7 @@ export default function App() {
 		{ to: "/", icon: LayoutDashboard, label: t("common.dashboard") },
 		{ to: "/mailboxes", icon: Settings, label: t("common.mailboxes") },
 		{ to: "/downloads", icon: Download, label: t("common.downloads") },
+		{ to: "/profile", icon: User, label: t("common.profile") },
 	];
 
 	const toggleLanguage = () => {
@@ -176,6 +179,10 @@ export default function App() {
 						<Route path="/mailboxes/new" element={<MailboxEditor />} />
 						<Route path="/mailboxes/:id" element={<MailboxEditor />} />
 						<Route path="/downloads" element={<Downloads />} />
+						<Route
+							path="/profile"
+							element={<Profile userEmail={user.email} />}
+						/>
 					</Routes>
 				</div>
 			</main>

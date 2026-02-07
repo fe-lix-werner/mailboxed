@@ -34,6 +34,12 @@ export const api = {
 		me: () => fetch(`${API_BASE}/auth/me`).then(handleResponse),
 		logout: () =>
 			fetch(`${API_BASE}/auth/logout`, { method: "POST" }).then(handleResponse),
+		updateProfile: (data: any) =>
+			fetch(`${API_BASE}/auth/profile`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(data),
+			}).then(handleResponse),
 	},
 	mailboxes: {
 		list: () => fetch(`${API_BASE}/mailboxes`).then(handleResponse),
