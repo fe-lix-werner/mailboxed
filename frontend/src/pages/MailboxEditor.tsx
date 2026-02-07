@@ -19,6 +19,8 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { ConfirmationModal } from "../components/ConfirmationModal";
+import { Modal } from "../components/Modal";
 
 export default function MailboxEditor() {
 	const { id } = useParams();
@@ -33,6 +35,10 @@ export default function MailboxEditor() {
 	const [connectionTested, setConnectionTested] = useState(false);
 	const [initialConnectionFields, setInitialConnectionFields] =
 		useState<any>(null);
+
+	const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
 	const { data: mailbox, isLoading } = useQuery({
 		queryKey: ["mailboxes", id],
@@ -175,7 +181,7 @@ export default function MailboxEditor() {
 			queryClient.invalidateQueries({ queryKey: ["mailboxes", id] });
 			queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
 			queryClient.invalidateQueries({ queryKey: ["jobs"] });
-			alert(t("editor.resetSuccess"));
+			setIsSuccessModalOpen(true);
 		},
 	});
 
@@ -242,15 +248,11 @@ export default function MailboxEditor() {
 	};
 
 	const handleReset = () => {
-		if (window.confirm(t("common.confirmReset"))) {
-			resetMutation.mutate();
-		}
+		setIsResetModalOpen(true);
 	};
 
 	const handleDelete = () => {
-		if (window.confirm(t("common.confirmDelete"))) {
-			deleteMutation.mutate();
-		}
+		setIsDeleteModalOpen(true);
 	};
 
 	const handleToggle = () => {
@@ -271,6 +273,41 @@ export default function MailboxEditor() {
 
 	return (
 		<div className="p-10 max-w-5xl mx-auto space-y-10 pb-20">
+			<ConfirmationModal
+				isOpen={isResetModalOpen}
+				onClose={() => setIsResetModalOpen(false)}
+				onConfirm={() => resetMutation.mutate()}
+				title={t("common.resetSync")}
+				message={t("common.confirmReset")}
+			/>
+			<ConfirmationModal
+				isOpen={isDeleteModalOpen}
+				onClose={() => setIsDeleteModalOpen(false)}
+				onConfirm={() => deleteMutation.mutate()}
+				title={t("common.delete")}
+				message={t("common.confirmDelete")}
+				variant="danger"
+			/>
+			<Modal
+				isOpen={isSuccessModalOpen}
+				onClose={() => setIsSuccessModalOpen(false)}
+				title={t("common.success")}
+				footer={
+					<button
+						onClick={() => setIsSuccessModalOpen(false)}
+						className="px-4 py-2 rounded-xl font-bold text-sm text-white bg-primary-600 hover:bg-primary-700 transition-colors"
+					>
+						{t("common.ok")}
+					</button>
+				}
+			>
+				<div className="flex items-center gap-4">
+					<div className="p-2 bg-green-100 text-green-600 rounded-lg dark:bg-green-900/30 dark:text-green-400">
+						<CheckCircle2 size={24} />
+					</div>
+					<p>{t("editor.resetSuccess")}</p>
+				</div>
+			</Modal>
 			<header className="flex items-center gap-6">
 				<button
 					onClick={() => navigate(-1)}

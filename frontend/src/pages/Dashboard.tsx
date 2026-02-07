@@ -15,7 +15,7 @@ import {
 	XCircle,
 	Zap,
 } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
@@ -33,6 +33,7 @@ import {
 } from "recharts";
 import { api } from "../api/client";
 import { formatSize } from "../lib/format";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 
 const CHART_COLORS = [
 	"#3b82f6",
@@ -189,8 +190,18 @@ const JobControlTile = ({ t }: { t: any }) => {
 	const activeJobs =
 		runningJobs?.filter((j: any) => j.status === "running") || [];
 
+	const [isAbortModalOpen, setIsAbortModalOpen] = useState(false);
+
 	return (
 		<div className="card p-6 flex flex-col h-full">
+			<ConfirmationModal
+				isOpen={isAbortModalOpen}
+				onClose={() => setIsAbortModalOpen(false)}
+				onConfirm={() => abortMutation.mutate()}
+				title={t("dashboard.jobsControl.abortAll")}
+				message={t("dashboard.jobsControl.confirmAbortAll")}
+				variant="danger"
+			/>
 			<div className="flex justify-between items-start mb-6">
 				<div>
 					<h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 dark:text-white">
@@ -232,9 +243,7 @@ const JobControlTile = ({ t }: { t: any }) => {
 				</button>
 				<button
 					onClick={() => {
-						if (confirm(t("common.confirmDelete"))) {
-							abortMutation.mutate();
-						}
+						setIsAbortModalOpen(true);
 					}}
 					disabled={activeJobs.length === 0 || abortMutation.isPending}
 					className="w-full btn bg-red-50 text-red-600 border-red-100 hover:bg-red-600 hover:text-white transition-all duration-300 font-bold text-xs py-2.5 gap-2 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/30 dark:hover:bg-red-600 dark:hover:text-white"

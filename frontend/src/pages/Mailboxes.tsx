@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play, Plus, RefreshCcw, Settings, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 
 export default function Mailboxes() {
 	const { t } = useTranslation();
@@ -24,6 +26,8 @@ export default function Mailboxes() {
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
 	});
 
+	const [deleteId, setDeleteId] = useState<number | null>(null);
+
 	if (isLoading)
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
@@ -36,6 +40,14 @@ export default function Mailboxes() {
 
 	return (
 		<div className="p-10 max-w-7xl mx-auto space-y-10">
+			<ConfirmationModal
+				isOpen={deleteId !== null}
+				onClose={() => setDeleteId(null)}
+				onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+				title={t("common.delete")}
+				message={t("common.confirmDelete")}
+				variant="danger"
+			/>
 			<header className="flex justify-between items-end">
 				<div>
 					<h1 className="text-4xl font-extrabold text-slate-900 tracking-tight dark:text-white">
@@ -136,9 +148,7 @@ export default function Mailboxes() {
 								<button
 									onClick={(e) => {
 										e.stopPropagation();
-										if (confirm(t("common.confirmDelete"))) {
-											deleteMutation.mutate(mailbox.id);
-										}
+										setDeleteId(mailbox.id);
 									}}
 									className="btn-danger w-11 h-11 p-0 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-300 dark:hover:bg-red-600"
 									title={t("common.delete")}

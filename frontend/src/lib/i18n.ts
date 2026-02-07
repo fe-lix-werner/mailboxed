@@ -38,6 +38,9 @@ i18n
 						pause: "Pause",
 						resume: "Resume",
 						viewAll: "View All",
+						confirm: "Confirm",
+						ok: "OK",
+						system: "System",
 						confirmDelete:
 							"Are you sure you want to delete this mailbox? All history will be kept but sync will stop.",
 						confirmReset:
@@ -64,6 +67,7 @@ i18n
 							restartAll: "Restart All",
 							pauseScheduler: "Pause Scheduler",
 							resumeScheduler: "Resume Scheduler",
+							confirmAbortAll: "Are you sure you want to abort all running jobs?",
 							runningJobs: "Running Jobs",
 							noRunningJobs: "No active sync jobs.",
 							schedulerPaused: "Scheduler is paused.",
@@ -200,6 +204,9 @@ i18n
 						pause: "Pause",
 						resume: "Fortsetzen",
 						viewAll: "Alle anzeigen",
+						confirm: "Bestätigen",
+						ok: "OK",
+						system: "System",
 						confirmDelete:
 							"Sind Sie sicher, dass Sie dieses Postfach löschen möchten? Der Verlauf bleibt erhalten, aber die Synchronisierung wird gestoppt.",
 						confirmReset:
@@ -220,6 +227,18 @@ i18n
 						pollInterval: "Abfrageintervall",
 						nextSync: "Nächster Sync",
 						syncMode: "Sync-Modus",
+						jobsControl: {
+							title: "Job-Steuerung",
+							subtitle: "Laufende und geplante Aufgaben verwalten.",
+							abortAll: "Alle abbrechen",
+							restartAll: "Alle neu starten",
+							pauseScheduler: "Planer anhalten",
+							resumeScheduler: "Planer fortsetzen",
+							confirmAbortAll: "Sind Sie sicher, dass Sie alle laufenden Aufgaben abbrechen möchten?",
+							runningJobs: "Laufende Aufgaben",
+							noRunningJobs: "Keine aktiven Aufgaben.",
+							schedulerPaused: "Planer ist angehalten.",
+						},
 						stats: {
 							totalFiles: "Gesamt Dateien",
 							totalSize: "Speicherplatz",

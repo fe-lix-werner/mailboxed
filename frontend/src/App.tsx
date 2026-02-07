@@ -137,7 +137,7 @@ export default function App() {
 							className="text-slate-400 group-hover:text-primary-500 transition-colors dark:text-slate-500 dark:group-hover:text-primary-400"
 						/>
 						<span className="font-semibold capitalize">
-							{theme === "system" ? t("common.system") || "System" : theme}
+							{theme === "system" ? t("common.system") : theme}
 						</span>
 					</button>
 					<button
