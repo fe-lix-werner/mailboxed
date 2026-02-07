@@ -691,7 +691,6 @@ export class MailboxEngine {
 		const fullDir = join(
 			process.env.DOWNLOAD_ROOT || "downloads",
 			mailbox.basePath,
-			mailbox.name,
 		);
 		try {
 			await rm(fullDir, { recursive: true, force: true });

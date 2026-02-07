@@ -60,7 +60,6 @@ export class AttachmentProcessor {
 			const fullDir = join(
 				process.env.DOWNLOAD_ROOT || "downloads",
 				this.basePath,
-				this.mailboxName,
 			);
 
 			await mkdir(fullDir, { recursive: true });
