@@ -14,7 +14,7 @@
 		"dev:frontend": "cd frontend && bun dev",
 		"dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"bun dev:backend\" \"bun dev:frontend\"",
 		"build:frontend": "cd frontend && bun run build",
-		"build": "bun build --target=bun --production --outdir=dist ./src/index.ts && bun run build:frontend && mkdir -p dist/static && cp -r frontend/dist/* dist/static",
+		"build": "bun build --target=bun --production --external pino --external pino-pretty --outdir=dist ./src/index.ts && bun run build:frontend && mkdir -p dist/static && cp -r frontend/dist/* dist/static",
 		"db:push": "bunx drizzle-kit push",
 		"db:migrate": "bun src/db/index.ts --migrate",
 		"lint": "biome check .",

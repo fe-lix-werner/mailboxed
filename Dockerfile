@@ -2,7 +2,7 @@ FROM oven/bun:1.1-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy production artifacts (assumed to be built outside Docker)
+# Copy production artifacts
 COPY dist ./dist
 # Copy migrations
 COPY drizzle ./drizzle
