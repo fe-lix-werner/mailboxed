@@ -1,0 +1,29 @@
+services:
+  mailboxed:
+    image: ghcr.io/fe-lix-werner/mailboxed:master
+    ports:
+      - "3000:3000"
+    volumes:
+      - data:/data
+      - downloads:/data/downloads
+    environment:
+      - DB_PATH=/data/mailboxed.sqlite
+      - DOWNLOAD_ROOT=/data/downloads
+      - DEFAULT_USER_EMAIL=${DEFAULT_USER_EMAIL:-admin@example.com}
+      - DEFAULT_USER_PASSWORD=${DEFAULT_USER_PASSWORD:-admin}
+      - LOG_LEVEL=${LOG_DEBUG:-info}
+      - LOG_PRETTY=true
+    healthcheck:
+      test: ["CMD", "bun", "-e", "await fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  data:
+  downloads:
+    driver_opts:
+      type: cifs
+      o: "username=${SMB_USER},password=${SMB_PASS},domain=${SMB_DOMAIN:-},vers=3.0"
+      device: "//${SMB_SERVER}/${SMB_SHARE}"

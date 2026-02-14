@@ -4,6 +4,8 @@
 
 Mailboxed connects to one or more IMAP mailboxes, downloads email attachments (optionally filtered by type), saves them to a designated folder structure on disk, and keeps a complete record of what was downloaded and when.
 
+📖 **[Read the Documentation](https://fe-lix-werner.github.io/mailboxed/)**
+
 
 ## Features
 
@@ -75,7 +77,7 @@ docker run -d \
   -p 3000:3000 \
   -v ./data:/data \
   -e APP_SECRET=your-secret \
-  ghcr.io/YOUR_GITHUB_USERNAME/mailboxed:main
+  ghcr.io/YOUR_GITHUB_USERNAME/mailboxed:master
 ```
 
 Replace `YOUR_GITHUB_USERNAME` with your GitHub username (lowercase).
@@ -99,3 +101,6 @@ Volumes are mapped to `/data` in the container, which contains both the SQLite d
 ## License
 
 MIT
+
+---
+*Documentation hosted at: [https://fe-lix-werner.github.io/mailboxed/](https://fe-lix-werner.github.io/mailboxed/)*
