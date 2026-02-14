@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
@@ -57,20 +57,33 @@ export class AttachmentProcessor {
 			const hash = createHash("sha256").update(info.content).digest("hex");
 
 			// 4. Determine path
+			const downloadRoot = process.env.DOWNLOAD_ROOT || "downloads";
+			const tmpRoot = process.env.TMP_DIR || join(downloadRoot, ".tmp");
+
 			const fullDir = join(
-				process.env.DOWNLOAD_ROOT || "downloads",
+				downloadRoot,
 				this.basePath,
 			);
 
 			await mkdir(fullDir, { recursive: true });
+			await mkdir(tmpRoot, { recursive: true });
 
 			const safeName = this.generateSafeFilename(info);
 			const targetPath = join(fullDir, safeName);
+			const tmpPath = join(tmpRoot, `${randomBytes(16).toString("hex")}-${safeName}`);
 
-			// 5. Save file
-			await writeFile(targetPath, info.content);
+			// 5. Save to temp file first
+			await writeFile(tmpPath, info.content);
 
-			// 6. Record in DB
+			// 6. Move to target path
+			try {
+				await rename(tmpPath, targetPath);
+			} catch (moveError: any) {
+				logger.error({ moveError, tmpPath, targetPath }, "Failed to move file from temp to target");
+				throw moveError;
+			}
+
+			// 7. Record in DB
 			await db.insert(downloads).values({
 				mailboxId: this.mailboxId,
 				folder: info.folder,

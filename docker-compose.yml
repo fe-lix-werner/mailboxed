@@ -9,6 +9,7 @@ services:
     environment:
       - DB_PATH=/data/mailboxed.sqlite
       - DOWNLOAD_ROOT=/data/downloads
+      - TMP_DIR=/data/tmp
       - DEFAULT_USER_EMAIL=${DEFAULT_USER_EMAIL:-admin@example.com}
       - DEFAULT_USER_PASSWORD=${DEFAULT_USER_PASSWORD:-admin}
       - LOG_LEVEL=${LOG_DEBUG:-info}

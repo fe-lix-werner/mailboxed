@@ -38,6 +38,7 @@ APP_SECRET=your-session-secret
 IMAP_CRED_MASTER_KEY=64-character-hex-string
 DB_PATH=mailboxed.sqlite
 DOWNLOAD_ROOT=downloads
+TMP_DIR=tmp
 LOG_LEVEL=info
 ```
 

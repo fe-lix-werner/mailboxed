@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { ImapFlow, type ImapFlowOptions } from "imapflow";
@@ -766,5 +766,33 @@ export class MailboxEngine {
 		}
 
 		return parts;
+	}
+
+	async cleanupTempDir() {
+		const downloadRoot = process.env.DOWNLOAD_ROOT || "downloads";
+		const tmpRoot = process.env.TMP_DIR || join(downloadRoot, ".tmp");
+
+		try {
+			const files = await readdir(tmpRoot);
+			const now = Date.now();
+			const threshold = 23 * 60 * 60 * 1000; // 23 hours in ms
+
+			for (const file of files) {
+				const filePath = join(tmpRoot, file);
+				try {
+					const s = await stat(filePath);
+					if (s.isFile() && now - s.mtimeMs > threshold) {
+						await rm(filePath, { force: true });
+						logger.info({ filePath }, "Cleaned up old temp file");
+					}
+				} catch (statErr) {
+					// File might have been moved/deleted already
+				}
+			}
+		} catch (err: any) {
+			if (err.code !== "ENOENT") {
+				logger.error({ err }, "Failed to cleanup temp directory");
+			}
+		}
 	}
 }

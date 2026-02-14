@@ -26,6 +26,12 @@ export class Scheduler {
 		logger.debug(
 			`Scheduler initialized with ${allMailboxes.length} active mailboxes`,
 		);
+
+		// Schedule temp directory cleanup every 24h
+		new Cron("0 0 * * *", async () => {
+			logger.info("Running scheduled temp directory cleanup");
+			await this.engine.cleanupTempDir();
+		});
 	}
 
 	pause() {

@@ -14,6 +14,7 @@ Mailboxed can be configured using environment variables.
 | `IMAP_CRED_MASTER_KEY` | 64-character hex string used to encrypt IMAP credentials at rest. | Generated automatically |
 | `DB_PATH` | Path to the SQLite database file. | `mailboxed.sqlite` |
 | `DOWNLOAD_ROOT` | Directory where attachments will be saved. | `downloads` |
+| `TMP_DIR` | Directory where attachments are temporarily stored during download. | `[DOWNLOAD_ROOT]/.tmp` |
 | `LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`). | `info` |
 | `PORT` | Port the server listens on. | `3000` |
 
@@ -30,6 +31,7 @@ APP_SECRET=your-session-secret
 IMAP_CRED_MASTER_KEY=64-character-hex-string
 DB_PATH=data/mailboxed.sqlite
 DOWNLOAD_ROOT=data/downloads
+TMP_DIR=data/tmp
 LOG_LEVEL=info
 ```
 
