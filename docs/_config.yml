@@ -1,6 +1,7 @@
 title: Mailboxed
 description: IMAP mailbox attachment downloader and manager
-remote_theme: jeffreytse/jekyll-theme-yat
+theme: jekyll-theme-cayman
+show_downloads: true
+remote_theme: pages-themes/cayman@v0.2.0
 plugins:
   - jekyll-remote-theme
-  - jekyll-seo-tag
