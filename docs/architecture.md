@@ -1,3 +1,7 @@
+---
+layout: default
+title: Architecture
+---
 # Architecture
 
 Mailboxed is built with a modern TypeScript stack, focusing on performance and simplicity.

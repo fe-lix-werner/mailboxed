@@ -1,3 +1,7 @@
+---
+layout: default
+title: Installation
+---
 # Installation Guide
 
 You can run Mailboxed either using Docker (recommended for production) or directly using Bun (recommended for development).

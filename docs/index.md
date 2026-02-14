@@ -1,3 +1,7 @@
+---
+layout: default
+title: Home
+---
 # Documentation Overview
 
 Welcome to the Mailboxed documentation.

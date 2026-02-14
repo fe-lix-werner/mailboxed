@@ -1,3 +1,7 @@
+---
+layout: default
+title: Usage Guide
+---
 # Usage Guide
 
 Once Mailboxed is running, you can access the web interface at `http://localhost:3000`.

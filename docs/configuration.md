@@ -1,3 +1,7 @@
+---
+layout: default
+title: Configuration
+---
 # Configuration
 
 Mailboxed can be configured using environment variables.
