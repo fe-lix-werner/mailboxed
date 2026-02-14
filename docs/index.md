@@ -1,8 +1,10 @@
 ---
-layout: default
+layout: home
 title: Home
 ---
 # Documentation Overview
+
+![Screenshot](assets/screenshot.webp)
 
 Welcome to the Mailboxed documentation.
 
