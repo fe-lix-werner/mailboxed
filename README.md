@@ -2,12 +2,13 @@
 
 ![img](./assets/mailboxed.webp)
 
+Mailboxed connects to one or more IMAP mailboxes, downloads email attachments (optionally filtered by type), saves them to a designated folder structure on disk, and keeps a complete record of what was downloaded and when.
+
 # Screenshots
 
 ![Screenshot](./assets/screenshot.webp)
 ![Screenshot](./assets/screenshot2.webp)
 
-Mailboxed connects to one or more IMAP mailboxes, downloads email attachments (optionally filtered by type), saves them to a designated folder structure on disk, and keeps a complete record of what was downloaded and when.
 
 📖 **[Read the Documentation](https://fe-lix-werner.github.io/mailboxed/)**
 
