@@ -272,7 +272,7 @@ export default function MailboxEditor() {
 		);
 
 	return (
-		<div className="p-10 max-w-5xl mx-auto space-y-10 pb-20">
+		<div className="p-4 md:p-10 max-w-5xl mx-auto space-y-8 md:space-y-10 pb-20">
 			<ConfirmationModal
 				isOpen={isResetModalOpen}
 				onClose={() => setIsResetModalOpen(false)}

@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
 	CheckCircle,
-	Clock,
+	Clock, DownloadIcon,
 	FileText,
 	HardDrive,
 	History,
@@ -13,7 +13,7 @@ import {
 	SkipForward,
 	Square,
 	XCircle,
-	Zap,
+	Zap
 } from "lucide-react";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -363,18 +363,18 @@ export default function Dashboard() {
 	};
 
 	return (
-		<div className="p-10 max-w-7xl mx-auto space-y-12">
+		<div className="p-4 md:p-10 max-w-7xl mx-auto space-y-8 md:space-y-12">
 			<header>
-				<h1 className="text-4xl font-extrabold text-slate-900 tracking-tight dark:text-white">
+				<h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight dark:text-white">
 					{t("dashboard.title")}
 				</h1>
-				<p className="text-slate-500 mt-2 text-lg dark:text-slate-400">
+				<p className="text-slate-500 mt-2 text-base md:text-lg dark:text-slate-400">
 					{t("dashboard.subtitle")}
 				</p>
 			</header>
 
 			{/* Stats Overview */}
-			<section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+			<section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
 				<div className="card p-6 flex items-center gap-5">
 					<div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm dark:bg-blue-950/30 dark:text-blue-400">
 						<FileText size={24} />
@@ -430,14 +430,14 @@ export default function Dashboard() {
 			</section>
 
 			{/* Charts Section */}
-			<section className="space-y-8">
-				<div className="card p-8">
-					<div className="flex items-center justify-between mb-8">
+			<section className="space-y-6 md:space-y-8">
+				<div className="card p-4 md:p-8">
+					<div className="flex items-center justify-between mb-6 md:mb-8">
 						<div>
-							<h2 className="text-xl font-bold text-slate-900 dark:text-white">
+							<h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">
 								{t("dashboard.stats.history")}
 							</h2>
-							<p className="text-sm text-slate-500 dark:text-slate-400">
+							<p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
 								{t("dashboard.historySubtitle")}
 							</p>
 						</div>
@@ -445,19 +445,19 @@ export default function Dashboard() {
 							<History size={20} />
 						</div>
 					</div>
-					<div className="h-[300px] w-full relative">
+					<div className="h-[250px] md:h-[300px] w-full relative">
 						<HistoryChart data={stats?.history || []} t={t} />
 					</div>
 				</div>
 
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-					<div className="card p-8">
-						<div className="flex items-center justify-between mb-8">
+				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+					<div className="card p-4 md:p-8">
+						<div className="flex items-center justify-between mb-6 md:mb-8">
 							<div>
-								<h2 className="text-xl font-bold text-slate-900 dark:text-white">
+								<h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">
 									{t("dashboard.stats.mimeBreakdown")}
 								</h2>
-								<p className="text-sm text-slate-500 dark:text-slate-400">
+								<p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
 									{t("dashboard.mimeSubtitle")}
 								</p>
 							</div>
@@ -465,7 +465,7 @@ export default function Dashboard() {
 								<FileText size={20} />
 							</div>
 						</div>
-						<div className="h-[300px] w-full relative">
+						<div className="h-[250px] md:h-[300px] w-full relative">
 							<MimeChart data={stats?.mimeBreakdown || []} t={t} />
 						</div>
 					</div>
@@ -474,7 +474,7 @@ export default function Dashboard() {
 				</div>
 			</section>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
 				{mailboxes?.map((mailbox: any) => (
 					<div key={mailbox.id} className="card group relative">
 						<Link
@@ -563,7 +563,8 @@ export default function Dashboard() {
 					</Link>
 				</div>
 				<div className="card">
-					<div className="overflow-x-auto">
+					{/* Desktop Table View */}
+					<div className="hidden md:block overflow-x-auto">
 						<table className="w-full text-left">
 							<thead>
 								<tr className="bg-slate-50/50 border-b border-slate-100 dark:bg-slate-800/50 dark:border-slate-800">
@@ -643,25 +644,78 @@ export default function Dashboard() {
 										</tr>
 									);
 								})}
-								{(stats?.lastDownloads?.length || 0) === 0 && (
-									<tr>
-										<td
-											colSpan={5}
-											className="px-8 py-16 text-center text-slate-400 italic font-medium dark:text-slate-600"
-										>
-											<div className="flex flex-col items-center gap-2">
-												<History
-													size={40}
-													className="text-slate-100 dark:text-slate-800"
-												/>
-												{t("dashboard.noRecentDownloads")}
-											</div>
-										</td>
-									</tr>
-								)}
 							</tbody>
 						</table>
 					</div>
+
+					{/* Mobile Card View */}
+					<div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+						{stats?.lastDownloads?.map((d: any) => {
+							const m = (mailboxes || []).find(
+								(mb: any) => mb.id === d.mailboxId,
+							);
+							const mailboxLabel = m?.name || d.mailboxId;
+							return (
+								<div key={d.id} className="p-4 space-y-4">
+									<div className="flex justify-between items-start gap-4">
+										<div className="flex-1 min-w-0">
+											<h4 className="font-bold text-slate-900 dark:text-white truncate">
+												{d.filename}
+											</h4>
+											<p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+												{d.subject}
+											</p>
+											<p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+												{d.from}
+											</p>
+										</div>
+										<div className="text-right shrink-0">
+											<span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+												{formatSize(d.size || 0)}
+											</span>
+											<span className="text-[10px] text-slate-400 block mt-1">
+												{new Date(d.downloadedAt).toLocaleDateString()}
+											</span>
+										</div>
+									</div>
+									<div className="flex items-center justify-between gap-3">
+										<span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded dark:bg-primary-950/30 dark:text-primary-400">
+											{mailboxLabel}
+										</span>
+										<div className="flex items-center gap-2">
+											<a
+												href={api.downloads.getContentUrl(d.id)}
+												target="_blank"
+												rel="noreferrer"
+												className="p-2 bg-slate-50 text-slate-600 rounded-lg dark:bg-slate-800 dark:text-slate-400"
+											>
+												<FileText size={18} />
+											</a>
+											<a
+												href={api.downloads.getContentUrl(d.id)}
+												download={d.filename}
+												className="p-2 bg-primary-50 text-primary-600 rounded-lg dark:bg-primary-950/30 dark:text-primary-400"
+											>
+												<DownloadIcon size={18} />
+											</a>
+										</div>
+									</div>
+								</div>
+							);
+						})}
+					</div>
+
+					{(stats?.lastDownloads?.length || 0) === 0 && (
+						<div className="px-8 py-16 text-center text-slate-400 italic font-medium dark:text-slate-600">
+							<div className="flex flex-col items-center gap-2">
+								<History
+									size={40}
+									className="text-slate-100 dark:text-slate-800"
+								/>
+								{t("dashboard.noRecentDownloads")}
+							</div>
+						</div>
+					)}
 				</div>
 			</section>
 
@@ -670,7 +724,8 @@ export default function Dashboard() {
 					{t("dashboard.recentJobs")}
 				</h2>
 				<div className="card">
-					<div className="overflow-x-auto">
+					{/* Desktop Table View */}
+					<div className="hidden md:block overflow-x-auto">
 						<table className="w-full text-left">
 							<thead>
 								<tr className="bg-slate-50/50 border-b border-slate-100 dark:bg-slate-800/50 dark:border-slate-800">
@@ -773,25 +828,80 @@ export default function Dashboard() {
 										</td>
 									</tr>
 								))}
-								{recentJobs?.length === 0 && (
-									<tr>
-										<td
-											colSpan={6}
-											className="px-8 py-16 text-center text-slate-400 italic font-medium dark:text-slate-600"
-										>
-											<div className="flex flex-col items-center gap-2">
-												<History
-													size={40}
-													className="text-slate-100 dark:text-slate-800"
-												/>
-												{t("dashboard.noJobs")}
-											</div>
-										</td>
-									</tr>
-								)}
 							</tbody>
 						</table>
 					</div>
+
+					{/* Mobile Card View */}
+					<div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+						{recentJobs?.map((job: any) => (
+							<div key={job.id} className="p-4 space-y-3">
+								<div className="flex justify-between items-start">
+									<div>
+										<h4 className="font-bold text-slate-800 dark:text-slate-200">
+											{job.mailboxName || job.mailboxId}
+										</h4>
+										<span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider dark:bg-slate-800 dark:text-slate-400">
+											{job.trigger}
+										</span>
+									</div>
+									<div className="text-right">
+										{job.status === "success" && (
+											<CheckCircle size={18} className="text-green-500 ml-auto" />
+										)}
+										{job.status === "failed" && (
+											<XCircle size={18} className="text-red-500 ml-auto" />
+										)}
+										{job.status === "running" && (
+											<RefreshCcw size={18} className="text-primary-500 animate-spin ml-auto" />
+										)}
+										{job.status === "pending" && (
+											<Clock size={18} className="text-slate-400 ml-auto" />
+										)}
+										<span className="text-[10px] text-slate-400 mt-1 block">
+											{formatDistanceToNow(new Date(job.startedAt))} ago
+										</span>
+									</div>
+								</div>
+								<div className="flex items-center justify-between text-xs pt-1">
+									<div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+										<Clock size={12} />
+										{job.finishedAt ? (
+											<span>
+												{Math.round(
+													(new Date(job.finishedAt).getTime() -
+														new Date(job.startedAt).getTime()) /
+														1000,
+												)}s
+											</span>
+										) : "-"}
+									</div>
+									<div className="flex flex-col items-end">
+										<span className="text-green-600 font-bold dark:text-green-400">
+											{job.attachmentCount || 0} {t("jobs.saved")}
+										</span>
+										{job.statsJson && JSON.parse(job.statsJson).errors > 0 && (
+											<span className="text-red-400 text-[10px]">
+												{JSON.parse(job.statsJson).errors} {t("jobs.errors")}
+											</span>
+										)}
+									</div>
+								</div>
+							</div>
+						))}
+					</div>
+
+					{recentJobs?.length === 0 && (
+						<div className="px-8 py-16 text-center text-slate-400 italic font-medium dark:text-slate-600">
+							<div className="flex flex-col items-center gap-2">
+								<History
+									size={40}
+									className="text-slate-100 dark:text-slate-800"
+								/>
+								{t("dashboard.noJobs")}
+							</div>
+						</div>
+					)}
 				</div>
 			</section>
 		</div>

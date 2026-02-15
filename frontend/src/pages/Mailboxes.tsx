@@ -39,7 +39,7 @@ export default function Mailboxes() {
 		);
 
 	return (
-		<div className="p-10 max-w-7xl mx-auto space-y-10">
+		<div className="p-4 md:p-10 max-w-7xl mx-auto space-y-6 md:space-y-10">
 			<ConfirmationModal
 				isOpen={deleteId !== null}
 				onClose={() => setDeleteId(null)}
@@ -48,57 +48,58 @@ export default function Mailboxes() {
 				message={t("common.confirmDelete")}
 				variant="danger"
 			/>
-			<header className="flex justify-between items-end">
+			<header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
 				<div>
-					<h1 className="text-4xl font-extrabold text-slate-900 tracking-tight dark:text-white">
+					<h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight dark:text-white">
 						{t("mailboxes.title")}
 					</h1>
-					<p className="text-slate-500 mt-2 text-lg dark:text-slate-400">
+					<p className="text-slate-500 mt-2 text-base md:text-lg dark:text-slate-400">
 						{t("mailboxes.subtitle")}
 					</p>
 				</div>
-				<Link to="/mailboxes/new" className="btn-primary gap-2 h-12 px-6">
+				<Link to="/mailboxes/new" className="btn-primary gap-2 h-11 md:h-12 px-6 w-full sm:w-auto">
 					<Plus size={20} />
 					{t("mailboxes.addMailbox")}
 				</Link>
 			</header>
 
-			<div className="grid grid-cols-1 gap-6">
+			<div className="grid grid-cols-1 gap-4 md:gap-6">
 				{mailboxes?.map((mailbox: any) => (
 					<div
 						key={mailbox.id}
 						onClick={() => navigate(`/mailboxes/${mailbox.id}`)}
-						className="cursor-pointer card group p-8 flex flex-col md:flex-row md:items-center justify-between gap-8"
+						className="cursor-pointer card group p-4 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-8"
 					>
-						<div className="flex items-center gap-6">
+						<div className="flex items-center gap-4 md:gap-6">
 							<div
-								className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+								className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center transition-all duration-300 ${
 									mailbox.enabled
 										? "bg-primary-50 text-primary-600 group-hover:bg-primary-600 group-hover:text-white group-hover:rotate-3 group-hover:shadow-lg group-hover:shadow-primary-200 dark:bg-primary-950/30 dark:text-primary-400 dark:group-hover:bg-primary-500 dark:group-hover:shadow-primary-900/40"
 										: "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
 								}`}
 							>
-								<Settings size={32} />
+								<Settings size={mailbox.enabled ? 24 : 20} className="md:w-8 md:h-8" />
 							</div>
-							<div>
-								<h3 className="font-bold text-2xl text-slate-900 dark:text-white">
+							<div className="flex-1 min-w-0">
+								<h3 className="font-bold text-xl md:text-2xl text-slate-900 dark:text-white truncate">
 									{mailbox.name}
 								</h3>
-								<div className="flex items-center gap-4 mt-1">
-									<span className="text-sm font-medium text-slate-500 flex items-center gap-1.5 dark:text-slate-400">
-										<span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+								<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1">
+									<span className="text-sm font-medium text-slate-500 flex items-center gap-1.5 dark:text-slate-400 truncate">
+										<span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 shrink-0" />
 										{mailbox.username}
 									</span>
-									<span className="text-sm font-medium text-slate-400 flex items-center gap-1.5 dark:text-slate-500">
-										<span className="w-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700" />
+									<span className="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
+									<span className="text-sm font-medium text-slate-400 flex items-center gap-1.5 dark:text-slate-500 truncate">
+										<span className="w-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
 										{mailbox.host}:{mailbox.port}
 									</span>
 								</div>
 							</div>
 						</div>
 
-						<div className="flex items-center gap-4">
-							<div className="flex flex-col items-end mr-6">
+						<div className="flex items-center justify-between md:justify-end gap-6 md:gap-4 border-t border-slate-50 md:border-0 pt-4 md:pt-0 dark:border-slate-800/50">
+							<div className="flex flex-col items-start md:items-end">
 								<span className="text-[10px] uppercase tracking-widest font-extrabold text-slate-400 dark:text-slate-500">
 									{t("common.status")}
 								</span>

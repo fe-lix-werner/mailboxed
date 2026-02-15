@@ -40,7 +40,7 @@ export default function Login() {
 					</p>
 				</div>
 
-				<div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
+				<div className="bg-white p-6 md:p-8 rounded-2xl md:rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
 					<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 						<div>
 							<label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1 dark:text-slate-400">
