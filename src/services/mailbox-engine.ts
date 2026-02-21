@@ -301,8 +301,7 @@ export class MailboxEngine {
 
 					if (
 						!uids ||
-						uids.length ===
-							0 /*|| (uids.length === 1 && uids[0] < checkpoint.lastUid + 1)*/
+						uids.length === 0
 					) {
 						logger.debug(
 							{ mailboxId, folder },
@@ -341,72 +340,16 @@ export class MailboxEngine {
 								envelope: msg.envelope,
 								parts,
 							});
-
-							// Update checkpoint per message to be resilient (as your original)
-							const currentCheckpoint = await db.query.checkpoints.findFirst({
-								where: and(
-									eq(checkpoints.mailboxId, mailboxId),
-									eq(checkpoints.folder, folder),
-								),
-							});
-
-							if (currentCheckpoint) {
-								await db
-									.update(checkpoints)
-									.set({
-										lastUid: msg.uid,
-									})
-									.where(eq(checkpoints.id, currentCheckpoint.id));
-							} else {
-								await db.insert(checkpoints).values({
-									mailboxId,
-									folder,
-									lastUid: msg.uid,
-								});
-							}
-						}
-					}
-
-					// If it was an "everything" or "from-now-on" sync but no messages were found,
-					// we should still create a checkpoint so next time we use UID
-					const finalCheckpoint = await db.query.checkpoints.findFirst({
-						where: and(
-							eq(checkpoints.mailboxId, mailboxId),
-							eq(checkpoints.folder, folder),
-						),
-					});
-
-					if (!finalCheckpoint?.lastUid && items.length === 0) {
-						const mailboxState = await client.status(folder, { uidNext: true });
-						if (mailboxState.uidNext) {
-							if (finalCheckpoint) {
-								await db
-									.update(checkpoints)
-									.set({
-										lastUid: mailboxState.uidNext - 1,
-										fromNowTimestamp:
-											mailbox.syncMode === "from-now-on"
-												? new Date().toISOString()
-												: finalCheckpoint.fromNowTimestamp,
-									})
-									.where(eq(checkpoints.id, finalCheckpoint.id));
-							} else {
-								await db.insert(checkpoints).values({
-									mailboxId,
-									folder,
-									lastUid: mailboxState.uidNext - 1,
-									fromNowTimestamp:
-										mailbox.syncMode === "from-now-on"
-											? new Date().toISOString()
-											: null,
-								});
-							}
 						}
 					}
 
 					// PHASE 2: now download parts sequentially (no active fetch iterator)
+					let folderHighWaterMark: number | null = null;
+					let folderError = false;
+
 					for (const item of items) {
 						if (signal.aborted) break;
+						let itemError = false;
 						for (const part of item.parts) {
 							if (signal.aborted) break;
 							let partAttempt = 0;
@@ -471,6 +414,7 @@ export class MailboxEngine {
 									}
 									if (result.error) {
 										stats.errors++;
+										itemError = true;
 										logger.error(
 											{
 												mailboxId,
@@ -492,11 +436,86 @@ export class MailboxEngine {
 											"Error downloading attachment after retries",
 										);
 										stats.errors++;
+										itemError = true;
 									} else {
 										const delay = 2 ** partAttempt * 500;
 										await new Promise((resolve) => setTimeout(resolve, delay));
 									}
 								}
+							}
+						}
+
+						if (!itemError) {
+							folderHighWaterMark = item.uid;
+						} else {
+							folderError = true;
+							// If this message failed, we don't advance the high water mark further.
+							// Subsequent messages might succeed, but we want the next sync to start from the first failed message.
+							// However, if we continue processing subsequent messages, we will download them again next time.
+							// To avoid double downloads, we COULD still process them, but the checkpoint stays at the first error.
+							// For simplicity, we just mark that we had an error and stop advancing highWaterMark.
+							break;
+						}
+					}
+
+					// Update checkpoint after processing all messages in folder (or up to the first error)
+					if (folderHighWaterMark !== null) {
+						const currentCheckpoint = await db.query.checkpoints.findFirst({
+							where: and(
+								eq(checkpoints.mailboxId, mailboxId),
+								eq(checkpoints.folder, folder),
+							),
+						});
+
+						if (currentCheckpoint) {
+							await db
+								.update(checkpoints)
+								.set({
+									lastUid: folderHighWaterMark,
+								})
+								.where(eq(checkpoints.id, currentCheckpoint.id));
+						} else {
+							await db.insert(checkpoints).values({
+								mailboxId,
+								folder,
+								lastUid: folderHighWaterMark,
+							});
+						}
+					}
+
+					// If it was an "everything" or "from-now-on" sync but no messages were found,
+					// we should still create a checkpoint so next time we use UID
+					const finalCheckpoint = await db.query.checkpoints.findFirst({
+						where: and(
+							eq(checkpoints.mailboxId, mailboxId),
+							eq(checkpoints.folder, folder),
+						),
+					});
+
+					if (!finalCheckpoint?.lastUid && items.length === 0 && !folderError) {
+						const mailboxState = await client.status(folder, { uidNext: true });
+						if (mailboxState.uidNext) {
+							if (finalCheckpoint) {
+								await db
+									.update(checkpoints)
+									.set({
+										lastUid: mailboxState.uidNext - 1,
+										fromNowTimestamp:
+											mailbox.syncMode === "from-now-on"
+												? new Date().toISOString()
+												: finalCheckpoint.fromNowTimestamp,
+									})
+									.where(eq(checkpoints.id, finalCheckpoint.id));
+							} else {
+								await db.insert(checkpoints).values({
+									mailboxId,
+									folder,
+									lastUid: mailboxState.uidNext - 1,
+									fromNowTimestamp:
+										mailbox.syncMode === "from-now-on"
+											? new Date().toISOString()
+											: null,
+								});
 							}
 						}
 					}
