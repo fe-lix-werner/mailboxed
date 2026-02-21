@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
@@ -75,30 +75,39 @@ export class AttachmentProcessor {
 			// 5. Save to temp file first
 			await writeFile(tmpPath, info.content);
 
-			// 6. Move to target path
 			try {
-				await rename(tmpPath, targetPath);
-			} catch (moveError: any) {
-				logger.error({ moveError, tmpPath, targetPath }, "Failed to move file from temp to target");
-				throw moveError;
-			}
+				// 6. Move to target path
+				try {
+					await rename(tmpPath, targetPath);
+				} catch (moveError: any) {
+					logger.error({ moveError, tmpPath, targetPath }, "Failed to move file from temp to target");
+					throw moveError;
+				}
 
-			// 7. Record in DB
-			await db.insert(downloads).values({
-				mailboxId: this.mailboxId,
-				folder: info.folder,
-				messageUid: info.messageUid,
-				messageDate: info.messageDate?.toISOString(),
-				from: info.from,
-				subject: info.subject,
-				attachmentPartId: info.attachmentPartId,
-				filename: info.filename,
-				mime: info.mime,
-				size: info.size,
-				sha256: hash,
-				path: targetPath,
-				jobId: this.jobId,
-			});
+				// 7. Record in DB
+				await db.insert(downloads).values({
+					mailboxId: this.mailboxId,
+					folder: info.folder,
+					messageUid: info.messageUid,
+					messageDate: info.messageDate?.toISOString(),
+					from: info.from,
+					subject: info.subject,
+					attachmentPartId: info.attachmentPartId,
+					filename: info.filename,
+					mime: info.mime,
+					size: info.size,
+					sha256: hash,
+					path: targetPath,
+					jobId: this.jobId,
+				});
+			} finally {
+				// Cleanup temp file if it still exists (e.g. if move failed or DB insert failed)
+				try {
+					await rm(tmpPath, { force: true });
+				} catch (_err) {
+					// Ignore cleanup errors
+				}
+			}
 
 			return { saved: true, skipped: false };
 		} catch (error: any) {
