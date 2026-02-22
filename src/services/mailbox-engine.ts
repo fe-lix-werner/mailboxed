@@ -318,7 +318,7 @@ export class MailboxEngine {
 							uid: true,
 							envelope: true,
 							bodyStructure: true,
-						});
+						}, {uid: true});
 
 						for await (const msg of fetcher) {
 							if (signal.aborted) break;
