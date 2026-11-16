@@ -1,4 +1,5 @@
-FROM oven/bun:1.1-slim AS runner
+# Keep in sync with the Bun version that builds dist/ in the publish workflow
+FROM oven/bun:1.3.7-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
