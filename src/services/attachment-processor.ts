@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { db } from "../db";
 import { downloads } from "../db/schema";
 import type { MailboxFilter } from "../types";
@@ -11,6 +11,8 @@ export interface AttachmentInfo {
 	mailboxId: number;
 	folder: string;
 	messageUid: number;
+	/** UIDVALIDITY of the folder the UID belongs to, if the server reported one. */
+	uidValidity?: string | null;
 	messageDate?: Date;
 	from?: string;
 	subject?: string;
@@ -53,6 +55,13 @@ export class AttachmentProcessor {
 					eq(downloads.folder, info.folder),
 					eq(downloads.messageUid, info.messageUid),
 					eq(downloads.attachmentPartId, info.attachmentPartId),
+					// The same UID means a different message once the folder was renumbered
+					info.uidValidity
+						? or(
+								isNull(downloads.uidValidity),
+								eq(downloads.uidValidity, info.uidValidity),
+							)
+						: undefined,
 				),
 			});
 
@@ -62,6 +71,28 @@ export class AttachmentProcessor {
 
 			// 3. Hash
 			const hash = createHash("sha256").update(info.content).digest("hex");
+
+			// After a renumbering the folder is scanned again and UIDs no longer
+			// identify what was saved before; the content does.
+			if (info.uidValidity) {
+				const savedBefore = await db.query.downloads.findFirst({
+					where: and(
+						eq(downloads.mailboxId, this.mailboxId),
+						eq(downloads.folder, info.folder),
+						eq(downloads.sha256, hash),
+						eq(downloads.filename, info.filename),
+						isNotNull(downloads.uidValidity),
+						ne(downloads.uidValidity, info.uidValidity),
+					),
+				});
+				if (savedBefore) {
+					return {
+						saved: false,
+						skipped: true,
+						reason: "already downloaded before the folder was renumbered",
+					};
+				}
+			}
 
 			// 4. Determine path
 			const downloadRoot = process.env.DOWNLOAD_ROOT || "downloads";
@@ -96,6 +127,7 @@ export class AttachmentProcessor {
 					mailboxId: this.mailboxId,
 					folder: info.folder,
 					messageUid: info.messageUid,
+					uidValidity: info.uidValidity,
 					messageDate: info.messageDate?.toISOString(),
 					from: info.from,
 					subject: info.subject,

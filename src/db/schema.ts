@@ -46,6 +46,9 @@ export const checkpoints = sqliteTable(
 			.notNull(),
 		folder: text("folder").notNull(),
 		lastUid: integer("last_uid"),
+		// UIDs are only meaningful within one UIDVALIDITY of the folder. Stored as
+		// text because the server reports it as a 32-bit unsigned value via BigInt.
+		uidValidity: text("uid_validity"),
 		fromNowTimestamp: text("from_now_timestamp"),
 	},
 	(table) => ({
@@ -82,6 +85,7 @@ export const downloads = sqliteTable(
 			.notNull(),
 		folder: text("folder").notNull(),
 		messageUid: integer("message_uid").notNull(),
+		uidValidity: text("uid_validity"),
 		messageDate: text("message_date"),
 		from: text("from"),
 		subject: text("subject"),

@@ -10,7 +10,11 @@ export async function setupTestDb() {
 	}
 
 	// Run migrations
-	const migrations = ["0000_petite_jazinda.sql", "0001_add_job_metadata.sql"];
+	const migrations = [
+		"0000_petite_jazinda.sql",
+		"0001_add_job_metadata.sql",
+		"0002_add_uid_validity.sql",
+	];
 	for (const file of migrations) {
 		const migrationFile = await readFile(
 			join(process.cwd(), "drizzle", file),
