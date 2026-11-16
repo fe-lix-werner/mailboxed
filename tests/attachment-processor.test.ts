@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { dirname } from "node:path";
 import { db } from "../src/db";
+import { downloads } from "../src/db/schema";
 import {
 	type AttachmentInfo,
 	AttachmentProcessor,
@@ -138,5 +140,78 @@ describe("AttachmentProcessor", () => {
 		const result2 = await processor.process(info);
 		expect(result2.saved).toBe(false);
 		expect(result2.skipped).toBe(true);
+	});
+
+	test("should keep both files when two attachments map to the same name", async () => {
+		const processor = new AttachmentProcessor(1, "TestMailbox", "base", {});
+
+		const first = await processor.process({
+			...baseInfo,
+			attachmentPartId: "2",
+			filename: "Rechnung.pdf",
+			mime: "application/pdf",
+			size: 6,
+			content: Buffer.from("%PDF-A"),
+		});
+		const second = await processor.process({
+			...baseInfo,
+			attachmentPartId: "3",
+			filename: "Rechnung.pdf",
+			mime: "application/pdf",
+			size: 6,
+			content: Buffer.from("%PDF-B"),
+		});
+		expect(first.saved).toBe(true);
+		expect(second.saved).toBe(true);
+
+		const records = await db.query.downloads.findMany();
+		expect(records).toHaveLength(2);
+		expect(records[0].path).not.toBe(records[1].path);
+		expect((await readFile(records[0].path as string)).toString()).toBe(
+			"%PDF-A",
+		);
+		expect((await readFile(records[1].path as string)).toString()).toBe(
+			"%PDF-B",
+		);
+	});
+
+	test("should report why an attachment was skipped", async () => {
+		const processor = new AttachmentProcessor(1, "TestMailbox", "base", {
+			maxSize: 100,
+		});
+
+		const result = await processor.process({
+			...baseInfo,
+			filename: "big.pdf",
+			mime: "application/pdf",
+			size: 500,
+			content: Buffer.from("x"),
+		});
+		expect(result.skipped).toBe(true);
+		expect(result.reason).toContain("above maximum");
+	});
+
+	test("should reuse the file name when the file on disk has the same content", async () => {
+		const processor = new AttachmentProcessor(1, "TestMailbox", "base", {});
+		const info: AttachmentInfo = {
+			...baseInfo,
+			filename: "Rechnung.pdf",
+			mime: "application/pdf",
+			size: 6,
+			content: Buffer.from("%PDF-A"),
+		};
+
+		await processor.process(info);
+		const [first] = await db.query.downloads.findMany();
+
+		// The file was written but its record never made it into the database
+		await db.delete(downloads);
+
+		const result = await processor.process(info);
+		expect(result.saved).toBe(true);
+
+		const [second] = await db.query.downloads.findMany();
+		expect(second.path).toBe(first.path);
+		expect(await readdir(dirname(second.path as string))).toHaveLength(1);
 	});
 });

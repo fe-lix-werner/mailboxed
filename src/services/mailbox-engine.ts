@@ -91,6 +91,41 @@ export class MailboxEngine {
 		this.activeSyncs.clear();
 	}
 
+	private createClient(options: ImapFlowOptions): ImapFlow {
+		const client = this.clientFactory
+			? this.clientFactory(options)
+			: new ImapFlow(options);
+
+		// ImapFlow reports a lost connection as an 'error' event, which is fatal
+		// to the process when nobody listens. The running command rejects as well,
+		// so that is where the failure is handled.
+		if (typeof client.on === "function") {
+			client.on("error", (err: any) => {
+				logger.warn({ err: err?.message, code: err?.code }, "IMAP connection error");
+			});
+		}
+		return client;
+	}
+
+	/**
+	 * Tears down a client whose connect() failed. ImapFlow removes its own socket
+	 * listeners before destroying the socket, and aborting a TLS handshake that
+	 * way raises one more socket error that would otherwise be unhandled.
+	 */
+	private discardClient(client: ImapFlow) {
+		const socket = (client as any).socket;
+		if (socket && typeof socket.on === "function") {
+			socket.on("error", () => {});
+		}
+		if (typeof client.close === "function") {
+			try {
+				client.close();
+			} catch (_closeErr) {
+				// already closed
+			}
+		}
+	}
+
 	async testConnection(config: any) {
 		const clientOptions: ImapFlowOptions = {
 			host: config.host,
@@ -104,12 +139,11 @@ export class MailboxEngine {
 			connectionTimeout: 10000,
 		};
 
-		const client = this.clientFactory
-			? this.clientFactory(clientOptions)
-			: new ImapFlow(clientOptions);
+		const client = this.createClient(clientOptions);
 		try {
 			await client.connect();
 		} catch (error: any) {
+			this.discardClient(client);
 			return { success: false, error: error.message };
 		}
 
@@ -218,12 +252,11 @@ export class MailboxEngine {
 		try {
 			while (attempt < maxRetries && !connected) {
 				try {
-					client = this.clientFactory
-						? this.clientFactory(clientOptions)
-						: new ImapFlow(clientOptions);
+					client = this.createClient(clientOptions);
 					await client.connect();
 					connected = true;
 				} catch (connErr: any) {
+					if (client) this.discardClient(client);
 					attempt++;
 					if (attempt >= maxRetries) throw connErr;
 					const delay = 2 ** attempt * 1000;
@@ -385,7 +418,9 @@ export class MailboxEngine {
 										attachmentPartId: part.part,
 										filename: part.filename,
 										mime: part.mime,
-										size: part.size,
+										// The size IMAP reports is that of the encoded part,
+										// roughly a third larger than the file for base64.
+										size: content.length,
 										content,
 									});
 
@@ -402,14 +437,23 @@ export class MailboxEngine {
 										);
 									} else if (result.skipped) {
 										stats.skipped++;
-										logger.debug(
+										// A filtered attachment is never looked at again once the
+										// checkpoint has moved on, so it has to be visible at the default log level.
+										const log =
+											result.reason === "already downloaded"
+												? logger.debug.bind(logger)
+												: logger.info.bind(logger);
+										log(
 											{
 												mailboxId,
+												folder,
 												uid: item.uid,
 												part: part.part,
 												filename: part.filename,
+												subject: item.envelope?.subject,
+												reason: result.reason,
 											},
-											"Attachment skipped by filters",
+											"Attachment skipped",
 										);
 									}
 									if (result.error) {
@@ -642,12 +686,15 @@ export class MailboxEngine {
 			disableAutoIdle: true,
 		};
 
-		const client = this.clientFactory
-			? this.clientFactory(clientOptions)
-			: new ImapFlow(clientOptions);
+		const client = this.createClient(clientOptions);
 
 		try {
-			await client.connect();
+			try {
+				await client.connect();
+			} catch (connErr) {
+				this.discardClient(client);
+				throw connErr;
+			}
 			const lock = await client.getMailboxLock(folder);
 			try {
 				const { content } = await client.download(String(messageUid), partId, {
@@ -725,6 +772,7 @@ export class MailboxEngine {
 	findAttachmentParts(
 		structure: any,
 		parts: AttachmentPart[] = [],
+		isRoot = true,
 	): AttachmentPart[] {
 		if (!structure) return parts;
 
@@ -736,18 +784,22 @@ export class MailboxEngine {
 		const rawSubtype = String(structure.subtype || "").toLowerCase();
 
 		const isMultipart =
-			rawType === "multipart" ||
-			rawType.startsWith("multipart/") ||
-			(rawType === "multipart" && !!rawSubtype);
+			rawType === "multipart" || rawType.startsWith("multipart/");
 
 		if (isMultipart) {
 			if (Array.isArray(structure.childNodes)) {
 				for (const child of structure.childNodes) {
-					this.findAttachmentParts(child, parts);
+					this.findAttachmentParts(child, parts, false);
 				}
 			}
 			return parts;
 		}
+
+		// - if rawType already contains '/', use it as-is (e.g. "application/pdf")
+		// - else combine type/subtype
+		const mime = rawType.includes("/")
+			? rawType
+			: `${rawType}/${rawSubtype || "octet-stream"}`;
 
 		const dispType = String(structure.disposition || "").toLowerCase();
 		const filename =
@@ -756,21 +808,25 @@ export class MailboxEngine {
 			structure.parameters?.name ||
 			"";
 
-		const isAttachment = dispType === "attachment" || !!filename;
+		// Some senders attach documents without a filename or disposition. Body
+		// text and inline images look the same, so only application/* parts are
+		// taken on type alone, minus the signature parts mail clients add.
+		const isUnnamedDocument =
+			mime.startsWith("application/") && !/signature|encrypted/.test(mime);
+
+		const isAttachment =
+			dispType === "attachment" || !!filename || isUnnamedDocument;
 
 		if (isAttachment) {
-			const partId = String(structure.part || "");
+			// A message that consists of a single part has no part number in the
+			// body structure; IMAP addresses that body as part 1.
+			const partId = String(structure.part || (isRoot ? "1" : ""));
 			if (partId) {
-				// Build MIME robustly:
-				// - if rawType already contains '/', use it as-is (e.g. "multipart/mixed", "application/pdf")
-				// - else combine type/subtype
-				const mime = rawType.includes("/")
-					? rawType
-					: `${rawType}/${rawSubtype || "octet-stream"}`;
-
 				parts.push({
 					part: partId,
-					filename: filename || "unnamed",
+					// Extension filters work on the name, so a nameless PDF still needs one
+					filename:
+						filename || (mime === "application/pdf" ? "unnamed.pdf" : "unnamed"),
 					mime,
 					size: Number(structure.size) || 0,
 				});
@@ -780,7 +836,7 @@ export class MailboxEngine {
 		// Defensive recursion for odd structures
 		if (Array.isArray(structure.childNodes)) {
 			for (const child of structure.childNodes) {
-				this.findAttachmentParts(child, parts);
+				this.findAttachmentParts(child, parts, false);
 			}
 		}
 

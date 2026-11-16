@@ -38,3 +38,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 downloads/
 data/
 .secrets.json
+
+# Local files with real mailbox credentials or server data
+test-ionos
+tests/ionos-integration.test.ts
+tests/search-messages-debug.test.ts
+mailboxed.log
+.output.txt
+Clipboard-*.webp

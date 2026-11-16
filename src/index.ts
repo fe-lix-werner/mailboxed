@@ -575,6 +575,15 @@ export const app = {
 };
 
 if (process.env.NODE_ENV !== "test") {
+	// A stray socket error from one mailbox must not take down the scheduler
+	// and the syncs of all other mailboxes with it.
+	process.on("uncaughtException", (err) => {
+		logger.error({ err }, "Uncaught exception");
+	});
+	process.on("unhandledRejection", (err) => {
+		logger.error({ err }, "Unhandled promise rejection");
+	});
+
 	(async () => {
 		// Run migrations before anything else
 		try {

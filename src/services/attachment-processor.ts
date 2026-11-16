@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { downloads } from "../db/schema";
@@ -21,6 +21,14 @@ export interface AttachmentInfo {
 	content: Buffer;
 }
 
+export type ProcessResult = {
+	saved: boolean;
+	skipped: boolean;
+	/** Why the attachment was not saved; lets the caller report skips instead of dropping them silently. */
+	reason?: string;
+	error?: string;
+};
+
 export class AttachmentProcessor {
 	constructor(
 		private mailboxId: number,
@@ -30,13 +38,12 @@ export class AttachmentProcessor {
 		private jobId?: number,
 	) {}
 
-	async process(
-		info: AttachmentInfo,
-	): Promise<{ saved: boolean; skipped: boolean; error?: string }> {
+	async process(info: AttachmentInfo): Promise<ProcessResult> {
 		try {
 			// 1. Filter
-			if (!this.matchesFilters(info)) {
-				return { saved: false, skipped: true };
+			const filterReason = this.filterRejection(info);
+			if (filterReason) {
+				return { saved: false, skipped: true, reason: filterReason };
 			}
 
 			// 2. Dedupe (Basic check by UID/Part)
@@ -50,7 +57,7 @@ export class AttachmentProcessor {
 			});
 
 			if (existing) {
-				return { saved: false, skipped: true };
+				return { saved: false, skipped: true, reason: "already downloaded" };
 			}
 
 			// 3. Hash
@@ -69,7 +76,7 @@ export class AttachmentProcessor {
 			await mkdir(tmpRoot, { recursive: true });
 
 			const safeName = this.generateSafeFilename(info);
-			const targetPath = join(fullDir, safeName);
+			const targetPath = await this.findFreeTargetPath(fullDir, safeName, hash);
 			const tmpPath = join(tmpRoot, `${randomBytes(16).toString("hex")}-${safeName}`);
 
 			// 5. Save to temp file first
@@ -116,6 +123,34 @@ export class AttachmentProcessor {
 		}
 	}
 
+	/**
+	 * Generated names are not unique: sanitizing and truncating can map different
+	 * attachments to the same name, and UIDs repeat across folders. A name is only
+	 * reused when the file already there has the same content.
+	 */
+	private async findFreeTargetPath(
+		dir: string,
+		safeName: string,
+		hash: string,
+	): Promise<string> {
+		const ext = extname(safeName);
+		const base = safeName.slice(0, safeName.length - ext.length);
+
+		for (let n = 1; ; n++) {
+			const candidate = join(dir, n === 1 ? safeName : `${base}-${n}${ext}`);
+			let existing: Buffer;
+			try {
+				existing = await readFile(candidate);
+			} catch (err: any) {
+				if (err.code === "ENOENT") return candidate;
+				throw err;
+			}
+			if (createHash("sha256").update(existing).digest("hex") === hash) {
+				return candidate;
+			}
+		}
+	}
+
 	private generateSafeFilename(info: AttachmentInfo): string {
 		const sanitize = (s: string | undefined, max: number) => {
 			if (!s) return "unknown";
@@ -145,11 +180,14 @@ export class AttachmentProcessor {
 		return `${sender}-${subject}-${filename}-${mailboxId}-${messageId}${ext}`;
 	}
 
-	private matchesFilters(info: AttachmentInfo): boolean {
+	/** Returns why the configured filters reject the attachment, or null if it passes. */
+	private filterRejection(info: AttachmentInfo): string | null {
 		const ext = info.filename.split(".").pop()?.toLowerCase();
 
 		if (this.filters.extensions?.length) {
-			if (!ext || !this.filters.extensions.includes(ext)) return false;
+			if (!ext || !this.filters.extensions.includes(ext)) {
+				return `extension "${ext ?? ""}" not in allowed extensions`;
+			}
 		}
 
 		if (this.filters.mimes?.length) {
@@ -167,11 +205,15 @@ export class AttachmentProcessor {
 				}
 				return info.mime === m;
 			});
-			if (!matches) return false;
+			if (!matches) return `type "${info.mime}" not in allowed types`;
 		}
-		if (this.filters.minSize && info.size < this.filters.minSize) return false;
-		if (this.filters.maxSize && info.size > this.filters.maxSize) return false;
+		if (this.filters.minSize && info.size < this.filters.minSize) {
+			return `size ${info.size} below minimum ${this.filters.minSize}`;
+		}
+		if (this.filters.maxSize && info.size > this.filters.maxSize) {
+			return `size ${info.size} above maximum ${this.filters.maxSize}`;
+		}
 
-		return true;
+		return null;
 	}
 }

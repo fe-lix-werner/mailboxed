@@ -1,7 +1,16 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	mock,
+	spyOn,
+	test,
+} from "bun:test";
 import { mkdir, rm } from "node:fs/promises";
 import { db } from "../src/db";
 import { checkpoints, mailboxes } from "../src/db/schema";
+import { logger } from "../src/services/logger";
 import { MailboxEngine } from "../src/services/mailbox-engine";
 import { encrypt } from "../src/services/security";
 import { setupTestDb } from "./test-utils";
@@ -168,5 +177,117 @@ describe("MailboxEngine Integration", () => {
 		const jobRecord = await db.query.jobs.findFirst();
 		expect(jobRecord?.status).toBe("failed");
 		expect(jobRecord?.errorText).toContain("Connection timed out");
+	});
+
+	test("should apply size filters to the decoded file, not the encoded part", async () => {
+		const [mailbox] = await db
+			.insert(mailboxes)
+			.values({
+				userId: 1,
+				name: "Test",
+				host: "localhost",
+				port: 993,
+				username: "user",
+				passwordEnc: await encrypt("pass"),
+				basePath: "test",
+				folderListJson: JSON.stringify(["INBOX"]),
+				filtersJson: JSON.stringify({ maxSize: 11 }),
+				enabled: true,
+			})
+			.returning();
+
+		const mockClient = {
+			connect: mock(async () => {}),
+			logout: mock(async () => {}),
+			getMailboxLock: mock(async () => ({ release: () => {} })),
+			search: mock(async () => [1]),
+			fetch: function* () {
+				yield {
+					uid: 1,
+					envelope: { date: new Date(), subject: "Bill" },
+					// A single-part message: the body itself is the PDF
+					bodyStructure: {
+						type: "application/pdf",
+						encoding: "base64",
+						disposition: "attachment",
+						dispositionParameters: { filename: "bill.pdf" },
+						size: 16,
+					},
+				};
+			},
+			download: mock(async () => ({ content: [Buffer.from("hello world")] })),
+			status: mock(async () => ({ uidNext: 2 })),
+		};
+
+		const engine = new MailboxEngine(() => mockClient as any);
+		await engine.sync(mailbox.id, "manual", true);
+
+		const downloadRecords = await db.query.downloads.findMany();
+		expect(downloadRecords).toHaveLength(1);
+		expect(downloadRecords[0].size).toBe(11);
+		const downloadArgs = mockClient.download.mock.calls[0] as unknown as any[];
+		expect(downloadArgs[1]).toBe("1");
+	});
+
+	test("should log a filtered attachment with its reason at info level", async () => {
+		const [mailbox] = await db
+			.insert(mailboxes)
+			.values({
+				userId: 1,
+				name: "Test",
+				host: "localhost",
+				port: 993,
+				username: "user",
+				passwordEnc: await encrypt("pass"),
+				basePath: "test",
+				folderListJson: JSON.stringify(["INBOX"]),
+				filtersJson: JSON.stringify({ extensions: ["pdf"] }),
+				enabled: true,
+			})
+			.returning();
+
+		const mockClient = {
+			connect: mock(async () => {}),
+			logout: mock(async () => {}),
+			getMailboxLock: mock(async () => ({ release: () => {} })),
+			search: mock(async () => [7]),
+			fetch: function* () {
+				yield {
+					uid: 7,
+					envelope: { date: new Date(), subject: "Ihre Rechnung" },
+					bodyStructure: {
+						part: "1",
+						type: "application/zip",
+						disposition: "attachment",
+						dispositionParameters: { filename: "rechnung.zip" },
+						size: 16,
+					},
+				};
+			},
+			download: mock(async () => ({ content: [Buffer.from("hello world")] })),
+			status: mock(async () => ({ uidNext: 8 })),
+		};
+
+		const infoSpy = spyOn(logger, "info");
+		try {
+			const engine = new MailboxEngine(() => mockClient as any);
+			await engine.sync(mailbox.id, "manual", true);
+
+			const calls = infoSpy.mock.calls as unknown as any[][];
+			const skipCall = calls.find((call) => call[1] === "Attachment skipped");
+			expect(skipCall).toBeDefined();
+			expect(skipCall?.[0]).toMatchObject({
+				mailboxId: mailbox.id,
+				folder: "INBOX",
+				uid: 7,
+				filename: "rechnung.zip",
+				subject: "Ihre Rechnung",
+			});
+			expect(skipCall?.[0].reason).toContain("extension");
+		} finally {
+			infoSpy.mockRestore();
+		}
+
+		expect(await db.query.downloads.findMany()).toHaveLength(0);
 	});
 });
